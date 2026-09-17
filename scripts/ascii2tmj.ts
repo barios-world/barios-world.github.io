@@ -1,8 +1,8 @@
 /**
  * ASCII level sketches (levels/src/*.txt) -> Tiled JSON maps (public/levels/*.tmj).
  * Legend:  # ground   = platform (1 tile thick)   ? block   S spawn   F flag   k checkpoint
- *          c card     C royal card                 m meistersager   P pipe (bottom-left cell)
- *          b bush     t palm                        // comment lines are ignored
+ *          c card     C royal card   m meistersager   P pipe (bottom cell)   ! coffee block
+ *          b bush     t palm         s sign                        // comment lines are ignored
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -54,8 +54,10 @@ for (const f of files) {
         case 'c': obj('card', cx, cy); break;
         case 'C': obj('royal', cx, cy); break;
         case 'm': obj('mob', cx, (y + 1) * TS); break;
-        case '?': obj('block', x * TS, y * TS, { width: TS, height: TS, point: false }); break;
-        case 'P': obj('pipe', x * TS, (y + 1) * TS, { width: TS * 2, height: TS * 3, point: false }); break;
+        case '?': obj('block', x * TS, y * TS, { width: TS, height: TS, point: false, properties: [{ name: 'contents', type: 'string', value: 'card' }] }); break;
+        case '!': obj('block', x * TS, y * TS, { width: TS, height: TS, point: false, properties: [{ name: 'contents', type: 'string', value: 'kaffee' }] }); break;
+        case 'P': obj('pipe', x * TS, (y + 1) * TS, { width: TS, height: TS * 2, point: false }); break;
+        case 's': obj('sign', cx, (y + 1) * TS); break;
         case 'b': obj('bush', cx, (y + 1) * TS); break;
         case 't': obj('palm', cx, (y + 1) * TS); break;
       }

@@ -1,6 +1,9 @@
 import Phaser from 'phaser';
 import { T } from '../config/Tuning';
 import type { InputSystem } from '../systems/Input';
+import { audio } from '../systems/Audio';
+
+export type Form = 'base' | 'kaffee';
 
 const approach = (v: number, target: number, delta: number) =>
   v < target ? Math.min(v + delta, target) : Math.max(v - delta, target);
@@ -18,10 +21,17 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   jumping = false;
   wasGrounded = false;
   grounded = false;
-  hurtUntil = 0;
   dead = false;
+  form: Form = 'base';
+  invulnUntil = 0;
+  throwCooldown = 0;
+  throwPoseUntil = 0;
+  controlLock = 0;
+  private blinkTween?: Phaser.Tweens.Tween;
+  private scaleTween?: Phaser.Tweens.Tween;
   onLand?: (x: number, y: number, speed: number) => void;
   onJump?: (x: number, y: number) => void;
+  onThrow?: (x: number, y: number, dir: number) => void;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y, 'spr', 'bario_idle_0');
@@ -31,7 +41,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.body.setSize(26, 52).setOffset(11, 6);
     this.body.setMaxVelocityY(T.TERMINAL_V);
     this.body.setGravityY(T.GRAVITY);
-    this.body.setCollideWorldBounds(false);
     this.gfx = scene.add.sprite(x, y, 'spr', 'bario_idle_0').setOrigin(0.5, 58 / 64).setDepth(10);
     this.gfx.play('bario_idle');
   }
@@ -44,23 +53,60 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.jumping = false;
     this.coyote = 0;
     this.buffer = 0;
+    this.controlLock = 0;
+    this.stopBlink();
     this.gfx.setScale(1, 1).setAlpha(1);
     this.syncGfx();
+  }
+
+  get invulnerable() { return this.scene.time.now < this.invulnUntil; }
+
+  setForm(f: Form) {
+    this.form = f;
+    this.scene.registry.set('form', f);
+  }
+
+  /** Returns true if the hit connected (not invulnerable). */
+  hurt(fromDir: number): boolean {
+    if (this.dead || this.invulnerable) return false;
+    this.invulnUntil = this.scene.time.now + T.INVULN_MS;
+    this.controlLock = 220;
+    this.body.setVelocity(fromDir * T.KNOCKBACK_X, -T.KNOCKBACK_Y);
+    this.startBlink();
+    if (this.form !== 'base') {
+      this.setForm('base');
+      audio.downgrade();
+      this.scene.events.emit('msg', 'KAFFEE WEG!', 700);
+      return true;
+    }
+    audio.hurt();
+    this.scene.registry.inc('hearts', -1);
+    return true;
+  }
+
+  bounce() {
+    this.body.setVelocityY(-T.JUMP_V * T.STOMP_BOUNCE);
+    this.jumping = true;
+    this.stretch();
   }
 
   update(inp: InputSystem, dt: number) {
     const b = this.body;
     const grounded = (this.grounded = b.blocked.down || b.touching.down);
+    this.controlLock = Math.max(0, this.controlLock - dt * 1000);
+    this.throwCooldown = Math.max(0, this.throwCooldown - dt * 1000);
+    const locked = this.controlLock > 0;
 
     // --- timers
     this.coyote = grounded ? T.COYOTE_MS : Math.max(0, this.coyote - dt * 1000);
-    this.buffer = inp.jumpPressed ? T.BUFFER_MS : Math.max(0, this.buffer - dt * 1000);
+    this.buffer = inp.jumpPressed && !locked ? T.BUFFER_MS : Math.max(0, this.buffer - dt * 1000);
 
     // --- jump (buffered + coyote)
     if (this.buffer > 0 && this.coyote > 0) {
       b.setVelocityY(-T.JUMP_V);
       this.buffer = 0; this.coyote = 0; this.jumping = true;
       this.stretch();
+      audio.jump();
       this.onJump?.(this.x, b.bottom);
     }
     if (this.jumping && !inp.jumpHeld && b.velocity.y < -T.JUMP_V * T.JUMP_CUT) b.setVelocityY(-T.JUMP_V * T.JUMP_CUT);
@@ -73,7 +119,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     b.setGravityY(g);
 
     // --- horizontal
-    const ax = inp.axis;
+    const ax = locked ? 0 : inp.axis;
     let vx = b.velocity.x;
     if (ax !== 0) {
       const max = Math.abs(ax) > T.RUN_THRESHOLD ? T.RUN_MAX : T.WALK_MAX;
@@ -82,14 +128,23 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       if (vx !== 0 && Math.sign(ax) !== Math.sign(vx)) acc *= T.TURN_BOOST;
       vx = approach(vx, target, acc * dt);
       this.facing = Math.sign(ax);
-    } else {
+    } else if (!locked) {
       vx = approach(vx, 0, (grounded ? T.GROUND_FRIC : T.AIR_DRAG) * dt);
     }
     b.setVelocityX(vx);
 
+    // --- attack
+    if (inp.attackPressed && !locked && this.form === 'kaffee' && this.throwCooldown <= 0) {
+      this.throwCooldown = T.CUP_COOLDOWN;
+      this.throwPoseUntil = this.scene.time.now + 180;
+      audio.throw();
+      this.onThrow?.(this.x + this.facing * 18, b.center.y - 6, this.facing);
+    }
+
     // --- landing
     if (grounded && !this.wasGrounded) {
       this.squash();
+      audio.land();
       this.onLand?.(this.x, b.bottom, Math.abs(b.prev.y - b.y));
     }
     this.wasGrounded = grounded;
@@ -100,12 +155,18 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   private animate(vx: number, grounded: boolean) {
     const g = this.gfx;
+    if (this.scene.time.now < this.throwPoseUntil) {
+      if (g.frame.name !== 'atk_kaffee_0') { g.anims.stop(); g.setTexture('spr', 'atk_kaffee_0'); }
+      g.setOrigin(24 / 72, 58 / 64).setFlipX(this.facing < 0);
+      return;
+    }
+    if (g.originX !== 0.5) g.setOrigin(0.5, 58 / 64);
     let key: string;
     if (!grounded) key = 'bario_jump';
     else if (Math.abs(vx) < 12) key = 'bario_idle';
     else if (Math.abs(vx) < T.WALK_MAX + 20) key = 'bario_walk';
     else key = 'bario_run';
-    if (g.anims.currentAnim?.key !== key) g.play(key, true);
+    if (g.anims.currentAnim?.key !== key || !g.anims.isPlaying) g.play(key, true);
     g.setFlipX(this.facing < 0);
   }
 
@@ -113,15 +174,26 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.gfx.setPosition(Math.round(this.body.center.x), Math.round(this.body.bottom));
   }
 
+  private startBlink() {
+    this.stopBlink();
+    this.blinkTween = this.scene.tweens.add({ targets: this.gfx, alpha: 0.25, duration: 80, yoyo: true, repeat: Math.floor(T.INVULN_MS / 160), onComplete: () => this.gfx.setAlpha(1) });
+  }
+
+  private stopBlink() {
+    this.blinkTween?.stop();
+    this.blinkTween = undefined;
+    this.gfx.setAlpha(1);
+  }
+
   private stretch() {
-    this.scene.tweens.killTweensOf(this.gfx);
+    this.scaleTween?.stop();
     this.gfx.setScale(0.82, 1.22);
-    this.scene.tweens.add({ targets: this.gfx, scaleX: 1, scaleY: 1, duration: 160, ease: 'Quad.out' });
+    this.scaleTween = this.scene.tweens.add({ targets: this.gfx, scaleX: 1, scaleY: 1, duration: 160, ease: 'Quad.out' });
   }
 
   private squash() {
-    this.scene.tweens.killTweensOf(this.gfx);
+    this.scaleTween?.stop();
     this.gfx.setScale(1.25, 0.78);
-    this.scene.tweens.add({ targets: this.gfx, scaleX: 1, scaleY: 1, duration: 140, ease: 'Back.out' });
+    this.scaleTween = this.scene.tweens.add({ targets: this.gfx, scaleX: 1, scaleY: 1, duration: 140, ease: 'Back.out' });
   }
 }

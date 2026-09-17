@@ -3,6 +3,12 @@ import { BootScene } from './scenes/BootScene';
 import { PreloadScene } from './scenes/PreloadScene';
 import { GameScene } from './scenes/GameScene';
 import { HudScene } from './scenes/HudScene';
+import { audio } from './systems/Audio';
+
+// iOS needs a user gesture before any sound can play
+const unlock = () => audio.unlock();
+window.addEventListener('pointerdown', unlock, { passive: true });
+window.addEventListener('keydown', unlock);
 
 /** Canvas runs at device resolution (crisp pixels); CSS zoom scales it back to the viewport. */
 const DPR = Math.min(window.devicePixelRatio || 1, 3);

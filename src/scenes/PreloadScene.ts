@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
+import { LEVELS } from '../data/levels';
 
 const ANIMS: [string, number][] = [
   ['bario_idle', 2], ['bario_walk', 10], ['bario_run', 14],
-  ['meister_idle', 2], ['meister_walk', 10], ['meister_run', 14],
+  ['meister_idle', 2], ['meister_walk', 9], ['meister_run', 14],
   ['direktor_idle', 2], ['direktor_walk', 8],
   ['formwalk_sport', 10], ['formwalk_boxer', 10], ['formwalk_skater', 10], ['formwalk_sprayer', 10], ['formwalk_dj', 10], ['formwalk_rocker', 10],
   ['formidle_sport', 2], ['formidle_boxer', 2], ['formidle_skater', 2], ['formidle_sprayer', 2], ['formidle_dj', 2], ['formidle_rocker', 2],
@@ -25,7 +26,8 @@ export class PreloadScene extends Phaser.Scene {
 
     this.load.atlas('spr', 'atlas.png', 'atlas.json');
     this.load.image('tiles', 'tiles.png');
-    this.load.tilemapTiledJSON('lvl_t1', 'levels/t1.tmj');
+    this.load.spritesheet('tilesS', 'tiles.png', { frameWidth: 32, frameHeight: 32 });
+    for (const l of LEVELS) this.load.tilemapTiledJSON(l.key, l.file);
   }
 
   async create() {
@@ -36,7 +38,8 @@ export class PreloadScene extends Phaser.Scene {
       ]);
     } catch { /* fonts are optional */ }
     this.makeAnims();
-    this.scene.start('game', { level: 'lvl_t1' });
+    const start = new URLSearchParams(location.search).get('level');
+    this.scene.start('game', { level: start && LEVELS.some((l) => l.key === start) ? start : LEVELS[0].key });
     this.scene.launch('hud');
   }
 

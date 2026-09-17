@@ -59,6 +59,18 @@ def assemble(include_scenes=True):
     s = G(5, 5); s.put(0, 0, "..L..\n.LLL.\nLLLLL\n.LLL.\n..L.."); add('fx_spark', s)
     # flag pole for level end (pole + pink pennant with B)
     add('flagpole', E.pennant('P'))
+    # projectiles + fx used by the game
+    cup = G(14, 14); P.prop_cup(cup, 2, 3, steam=False); add('proj_cup', cup)
+    card = G(9, 12); P.prop_card(card, 1, 1, 'R'); add('proj_card', card)
+    ball = G(10, 10); P.prop_ball(ball, 5, 5, 3.2); add('proj_khusra', ball)
+    wave = G(20, 36)
+    for i, (r, col) in enumerate(((9, 'O'), (15, '='))):
+        P.ring(wave, 2, 18, r, r * 1.6, col, thick=2.2, only=lambda x, y, r=r: x > 2 + r * 0.25)
+    add('fx_wave', wave)
+    add('pipe_big', I.pipe(32, 64))
+    hill = G(96, 40); hill.ellipse(48, 46, 50, 34, 'a', n=2.2, only=lambda x, y: y < 40); hill.ellipse(46, 48, 46, 32, 'A', n=2.2, only=lambda x, y: y < 40)
+    hill.ellipse(30, 20, 10, 6, 'F'); add('hill', hill)
+    far = G(120, 48); far.ellipse(60, 58, 64, 46, 'p', n=2.2, only=lambda x, y: y < 48); far.ellipse(58, 60, 60, 44, 'P', n=2.2, only=lambda x, y: y < 48); add('hill_far', far)
     add('bush', E.bush(30)); add('palm', E.palm(52)); add('cloud', E.cloud(26)); add('sign', E.sign(['BARIOS WORLD >']))
 
     if include_scenes:
