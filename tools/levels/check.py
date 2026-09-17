@@ -26,9 +26,17 @@ def load(path):
     return [r.ljust(w, '.') for r in rows], w, h
 
 
+def sidecar(path):
+    sp = path[:-4] + '.objects.json'
+    if not os.path.exists(sp): return []
+    import json
+    return json.load(open(sp))
+
+
 def check(path):
     g, w, h = load(path)
     issues = []
+    extra = sidecar(path)
     at = lambda x, y: g[y][x] if 0 <= x < w and 0 <= y < h else ('#' if y >= h else '.')
     solidset = set()
     for y in range(h):
@@ -37,6 +45,9 @@ def check(path):
             if ch in SOLID: solidset.add((x, y))
             if ch == 'P': solidset.add((x, y)); solidset.add((x, y - 1))
             if ch == '-': solidset.add((x, y)); solidset.add((x + 1, y))
+    # sidecar pipes are 2 tall solids; doors are open
+    for e in extra:
+        if e['type'] == 'warp' and e['props'].get('kind', 'pipe') == 'pipe': solidset.add((e['x'], e['y'])); solidset.add((e['x'], e['y'] - 1))
     solid = lambda x, y: (x, y) in solidset
     free = lambda x, y: 0 <= y < h and 0 <= x < w and not solid(x, y)
 
@@ -54,6 +65,31 @@ def check(path):
             else: continue
             for (cx, cy) in cells:
                 if free(cx, cy) and free(cx, cy - 1): stand.add((cx, cy)); movers[(cx, cy)] = ch
+
+    # sidecar movers (like ~ / |), orbit pads (a cluster of cells around the hub) and warps (free edges between pairs)
+    clusters, links = [], []
+    for e in extra:
+        pr = e['props']
+        if e['type'] == 'moveplat':
+            r = int(pr.get('range', 96)) // 32; x, y = e['x'], e['y']
+            cells = [(x + i, y - 1 + k) for i in (0, 1) for k in range(-r, r + 1)] if pr.get('vertical') else [(x + k, y - 1) for k in range(-r, r + 3)]
+            for (cx, cy) in cells:
+                if free(cx, cy) and free(cx, cy - 1): stand.add((cx, cy))
+        elif e['type'] == 'orbit':
+            r = int(pr.get('radius', 80)) // 32; x, y = e['x'], e['y']
+            cl = [(x, y - 1), (x + 1, y - 1)]
+            for (cx, cy) in [(x - r, y), (x - r - 1, y), (x + r + 1, y), (x + r + 2, y), (x, y - r), (x + 1, y - r), (x - r, y - 1), (x + r + 1, y - 1)]:
+                if free(cx, cy) and free(cx, cy - 1): cl.append((cx, cy))
+            for c in cl: stand.add(c)
+            clusters.append(cl)
+    warps = {e['props']['id']: e for e in extra if e['type'] == 'warp'}
+    for e in warps.values():
+        t = warps.get(e['props']['target'])
+        if not t: issues.append(f"warp {e['props']['id']} has no target"); continue
+        me = (e['x'], e['y'] - 2) if e['props'].get('kind', 'pipe') == 'pipe' else (e['x'], e['y'])
+        you = (t['x'], t['y'] - 2) if t['props'].get('kind', 'pipe') == 'pipe' else (t['x'], t['y'])
+        if me not in stand: issues.append(f"warp {e['props']['id']}: no standing spot at col {me[0]} row {me[1]}")
+        links.append((me, you))
 
     # slits: floating solid with exactly one free tile below -> Bario can neither pass nor stand
     for (x, y) in sorted(solidset):
@@ -103,6 +139,9 @@ def check(path):
         while q:
             a = q.popleft()
             nxt = [b for b in stand if b not in seen and can_jump(a, b, rule)] + [b for b in vent_edges(a) if b not in seen]
+            nxt += [you for (me, you) in links if me == a and you not in seen]
+            for cl in clusters:
+                if a in cl: nxt += [c for c in cl if c not in seen]
             for b in nxt: seen.add(b); q.append(b)
         return seen
     seen = bfs(MAIN)

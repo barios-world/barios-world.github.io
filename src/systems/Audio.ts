@@ -115,7 +115,20 @@ export const TRACK_BOSS: Track = {
   melVoice: 'sawtooth',
 };
 
-export const TRACKS = { boulevard: TRACK_BOULEVARD, coffee: TRACK_COFFEE, casino: TRACK_CASINO, vfb: TRACK_VFB, title: TRACK_TITLE, boss: TRACK_BOSS };
+const variant = (t: Track, drums: string, extra: Partial<Track> = {}): Track => ({ ...t, drums, ...extra });
+/** Per level three moods: calm intro, full groove, finale. Sections switch them via 'section' zones. */
+export const TRACKS: Record<string, Track> = {
+  boulevard: TRACK_BOULEVARD,
+  boulevard_calm: variant(TRACK_BOULEVARD, 'k.......k...H...', { melVoice: 'triangle' }),
+  boulevard_finale: variant(TRACK_BOULEVARD, 'k.sHk.sHk.sHksHH', { bpm: 132 }),
+  coffee: TRACK_COFFEE,
+  coffee_calm: variant(TRACK_COFFEE, 'k.......H.......', { melVoice: 'sine' }),
+  coffee_finale: variant(TRACK_COFFEE, 'k.Hsk.Hsk.Hsk.HH', { bpm: 108 }),
+  casino: TRACK_CASINO,
+  casino_calm: variant(TRACK_CASINO, 'k...H...k...H...', { melVoice: 'triangle' }),
+  casino_finale: variant(TRACK_CASINO, 'k.HskHHsk.HskHHH', { bpm: 120 }),
+  vfb: TRACK_VFB, title: TRACK_TITLE, boss: TRACK_BOSS,
+};
 
 class Synth {
   private ctx?: AudioContext;
@@ -282,6 +295,10 @@ class Synth {
   pound() { this.sfx(() => { this.noise(0.22, 0.25, 900); this.tone('sawtooth', 700, 150, 0.22, 0.25); }); }
   slam() { this.sfx(() => { this.tone('sine', 140, 40, 0.28, 0.7); this.noise(0.14, 0.4, 200); this.tone('square', 90, 60, 0.2, 0.3, 0.02); }); }
   chain(n: number) { this.sfx(() => { const f = 520 * Math.pow(1.122, Math.min(n, 8)); this.tone('square', f, f * 1.5, 0.1, 0.35); this.tone('square', f * 1.5, f * 2, 0.08, 0.25, 0.07); }); }
+  warp() { this.sfx(() => { this.tone('square', 600, 120, 0.35, 0.3); this.noise(0.3, 0.15, 400); }); }
+  tip() { this.sfx(() => { this.tone('sawtooth', 220, 70, 0.7, 0.35); this.noise(0.5, 0.2, 300, 0.4); }); }
+  storm() { this.sfx(() => [880, 1100, 880, 1320].forEach((f, i) => this.tone('square', f, f, 0.14, 0.3, i * 0.15))); }
+  reveal() { this.sfx(() => [0, 0.09, 0.18].forEach((d) => { this.noise(0.05, 0.18, 2500, d); this.tone('triangle', 700, 1000, 0.06, 0.2, d); })); }
   sparkle() { this.sfx(() => [1047, 1319, 1568, 2093].forEach((f, i) => this.tone('triangle', f, f * 1.02, 0.08, 0.2, i * 0.04))); }
 
   // ------------------------------------------------------------------ music sequencer

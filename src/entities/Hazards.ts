@@ -6,7 +6,7 @@ import { audio } from '../systems/Audio';
 export class Puddle extends Phaser.Physics.Arcade.Image {
   declare body: Phaser.Physics.Arcade.StaticBody;
   constructor(scene: Phaser.Scene, x: number, groundY: number) {
-    super(scene, x, groundY, 'spr', 'haz_puddle_0');
+    super(scene, x, groundY, 'spr', 'haz_sugar_0');
     scene.add.existing(this);
     scene.physics.add.existing(this, true);
     this.setOrigin(0.5, 1).setDepth(3);
@@ -94,8 +94,8 @@ export class CardPlatform extends Phaser.Physics.Arcade.Image {
 export class MovingPlatform extends Phaser.Physics.Arcade.Image {
   declare body: Phaser.Physics.Arcade.Body;
   x0: number; y0: number; range: number; speed: number; vertical: boolean;
-  constructor(scene: Phaser.Scene, x: number, y: number, range = 96, speed = 60, vertical = false) {
-    super(scene, x, y, 'spr', 'plat_move_0');
+  constructor(scene: Phaser.Scene, x: number, y: number, range = 96, speed = 60, vertical = false, frame = 'plat_move_0') {
+    super(scene, x, y, 'spr', frame);
     scene.add.existing(this);
     scene.physics.add.existing(this);
     this.setDepth(3);
@@ -114,5 +114,42 @@ export class MovingPlatform extends Phaser.Physics.Arcade.Image {
       if (this.x > this.x0 + this.range) this.body.setVelocityX(-this.speed);
       else if (this.x < this.x0 - this.range) this.body.setVelocityX(this.speed);
     }
+  }
+}
+
+/** Roulette pad: rides a circle around (cx, cy). Velocity is set every tick so Arcade friction carries Bario along. */
+export class OrbitPad extends Phaser.Physics.Arcade.Image {
+  declare body: Phaser.Physics.Arcade.Body;
+  theta: number;
+  constructor(scene: Phaser.Scene, public cx: number, public cy: number, public radius: number, theta: number, public speed: number) {
+    super(scene, cx + Math.cos(Phaser.Math.DegToRad(theta)) * radius, cy + Math.sin(Phaser.Math.DegToRad(theta)) * radius, 'spr', 'plat_move_0');
+    scene.add.existing(this);
+    scene.physics.add.existing(this);
+    this.theta = theta;
+    this.setDepth(3);
+    this.body.setAllowGravity(false);
+    this.body.setImmovable(true);
+    this.body.setFriction(1, 0);
+    this.body.setSize(64, 14).setOffset(0, 0);
+  }
+  tick(dt: number) {
+    if (dt <= 0) return;
+    this.theta += this.speed * dt;
+    const a = Phaser.Math.DegToRad(this.theta);
+    const nx = this.cx + Math.cos(a) * this.radius, ny = this.cy + Math.sin(a) * this.radius;
+    this.body.velocity.set((nx - this.x) / dt, (ny - this.y) / dt);
+  }
+}
+
+/** Conveyor belt drawn over the top of ground tiles; GameScene shifts whoever stands on it. */
+export class Conveyor extends Phaser.GameObjects.TileSprite {
+  constructor(scene: Phaser.Scene, x: number, top: number, w: number, public speed: number) {
+    super(scene, x, top, w, 12, 'spr', 'belt_0');
+    scene.add.existing(this);
+    this.setOrigin(0, 0).setDepth(2);
+  }
+  tick(dt: number) { this.tilePositionX += this.speed * dt; }
+  carries(b: Phaser.Physics.Arcade.Body) {
+    return b.blocked.down && Math.abs(b.bottom - this.y) < 6 && b.right > this.x && b.left < this.x + this.width;
   }
 }

@@ -2,8 +2,9 @@ import Phaser from 'phaser';
 import { T } from '../config/Tuning';
 import type { GameScene } from './GameScene';
 import { FORMS, SPECIALS, isForm, isSpecial } from '../data/forms';
+import { audio } from '../systems/Audio';
 
-type Overlay = { kind: 'result' | 'gameover'; lines: string[]; hint: string } | null;
+type Overlay = { kind: 'result' | 'gameover'; lines: string[]; hint: string; hand?: { cards: number; royals: number } } | null;
 
 /** HUD + touch controls + overlays, drawn in canvas pixels (DPR-aware), independent of the game camera zoom. */
 export class HudScene extends Phaser.Scene {
@@ -30,6 +31,10 @@ export class HudScene extends Phaser.Scene {
   private ovPanel!: Phaser.GameObjects.Graphics;
   private ovLines: Phaser.GameObjects.Text[] = [];
   private ovHint!: Phaser.GameObjects.Text;
+  private ovCards: Phaser.GameObjects.Image[] = [];
+  private introPanel!: Phaser.GameObjects.Graphics;
+  private introTitle!: Phaser.GameObjects.Text;
+  private introMotto!: Phaser.GameObjects.Text;
   private overlay: Overlay = null;
   private inset = { top: 0, left: 0, right: 0, bottom: 0 };
   private touch = false;
@@ -68,6 +73,13 @@ export class HudScene extends Phaser.Scene {
     this.ovPanel = this.add.graphics().setDepth(20).setVisible(false);
     for (let i = 0; i < 6; i++) this.ovLines.push(this.add.text(0, 0, '', { ...font, fontSize: `${(i === 0 ? 16 : 9) * u}px`, color: i === 0 ? '#FF4FA3' : '#FFF4DC', align: 'center' }).setOrigin(0.5).setDepth(21).setVisible(false));
     this.ovHint = this.add.text(0, 0, '', { ...font, fontSize: `${7 * u}px`, color: '#A79C90' }).setOrigin(0.5).setDepth(21).setVisible(false);
+    this.ovCards = [];
+    for (let i = 0; i < 8; i++) this.ovCards.push(this.add.image(0, 0, 'spr', 'it_karte_0').setDepth(22).setScale(2 * u).setVisible(false));
+    // level intro card: chalk strip with the station name and its motto
+    this.introPanel = this.add.graphics().setDepth(18).setVisible(false);
+    this.introTitle = this.add.text(0, 0, '', { ...font, fontSize: `${13 * u}px`, color: '#FF4FA3' }).setOrigin(0.5).setDepth(19).setVisible(false).setShadow(2 * u, 2 * u, '#14100E', 0, true, true);
+    this.introMotto = this.add.text(0, 0, '', { fontFamily: 'Caveat, cursive', fontSize: `${15 * u}px`, color: '#FFF4DC', fontStyle: 'bold' }).setOrigin(0.5).setDepth(19).setVisible(false);
+    this.on(this.gameScene.events, 'intro', (d: { name: string; motto: string }) => this.showIntro(d.name, d.motto));
 
     this.readInsets();
     this.layout();
@@ -119,6 +131,7 @@ export class HudScene extends Phaser.Scene {
     const on = !!o;
     this.ovPanel.setVisible(on);
     this.ovHint.setVisible(on);
+    this.ovCards.forEach((c) => c.setVisible(false));
     this.ovLines.forEach((l, i) => l.setVisible(on && !!o!.lines[i]).setText(on ? (o!.lines[i] ?? '') : ''));
     if (on) {
       this.ovHint.setText(o!.hint);
@@ -128,7 +141,8 @@ export class HudScene extends Phaser.Scene {
 
   private layoutOverlay() {
     const w = this.scale.width, h = this.scale.height, u = this.u;
-    const pw = Math.min(w * 0.8, 360 * u), ph = 170 * u;
+    const hand = this.overlay?.hand;
+    const pw = Math.min(w * 0.8, 360 * u), ph = (hand ? 214 : 170) * u;
     const x = (w - pw) / 2, y = (h - ph) / 2;
     this.ovPanel.clear();
     this.ovPanel.fillStyle(0x0f0d0c, 0.92).fillRoundedRect(x, y, pw, ph, 10 * u);
@@ -136,6 +150,38 @@ export class HudScene extends Phaser.Scene {
     let cy = y + 30 * u;
     this.ovLines.forEach((l, i) => { l.setPosition(w / 2, cy); cy += (i === 0 ? 30 : 17) * u; });
     this.ovHint.setPosition(w / 2, y + ph - 18 * u);
+    if (hand) this.layoutHand(hand, w / 2, y + ph - 52 * u, u);
+  }
+
+  /** CAMBIO! – the collected hand is revealed as a fan of cards (royals golden). */
+  private layoutHand(hand: { cards: number; royals: number }, cx: number, cy: number, u: number) {
+    const n = Math.min(8, Math.max(1, Math.min(hand.cards, 5) + Math.min(hand.royals, 4)));
+    const frames = ['it_karte_0', 'it_karte_blau_0', 'it_karte_gruen_0'];
+    let royalsLeft = Math.min(hand.royals, 4);
+    const step = Math.min(30 * u, 190 * u / n);
+    this.ovCards.forEach((c, i) => {
+      if (i >= n) { c.setVisible(false); return; }
+      const royal = royalsLeft > 0 && i >= n - Math.min(hand.royals, 4);
+      if (royal) royalsLeft--;
+      const t = n === 1 ? 0 : i / (n - 1) - 0.5;
+      c.setFrame(royal ? 'it_karte_gelb_0' : frames[i % 3]).setVisible(true).setAlpha(0).setScale(0.2)
+        .setPosition(cx + t * step * (n - 1), cy + Math.abs(t) * 10 * u).setAngle(t * 36);
+      this.tweens.add({ targets: c, alpha: 1, scale: 2 * u, duration: 220, delay: 80 + i * 70, ease: 'Back.out' });
+    });
+    this.time.delayedCall(80, () => audio.reveal());
+  }
+
+  private showIntro(name: string, motto: string) {
+    const w = this.scale.width, h = this.scale.height, u = this.u;
+    const pw = Math.min(w * 0.7, 300 * u), ph = 52 * u, x = (w - pw) / 2, y = h * 0.16;
+    this.introPanel.clear().setVisible(true).setAlpha(0);
+    this.introPanel.fillStyle(0x171311, 0.9).fillRoundedRect(x, y, pw, ph, 6 * u);
+    this.introPanel.lineStyle(2 * u, 0xff4fa3, 1).strokeRoundedRect(x, y, pw, ph, 6 * u);
+    this.introTitle.setText(name).setPosition(w / 2, y + 17 * u).setVisible(true).setAlpha(0);
+    this.introMotto.setText(motto).setPosition(w / 2, y + 38 * u).setVisible(true).setAlpha(0);
+    const targets = [this.introPanel, this.introTitle, this.introMotto];
+    this.tweens.add({ targets, alpha: 1, duration: 260 });
+    this.time.delayedCall(2400, () => this.tweens.add({ targets, alpha: 0, duration: 350, onComplete: () => targets.forEach((t) => t.setVisible(false)) }));
   }
 
   /** Safe-area insets (Dynamic Island / home indicator) measured from CSS env(), converted to canvas px. */

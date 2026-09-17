@@ -1,0 +1,274 @@
+[
+{
+"type": "deco",
+"x": 7,
+"y": 9,
+"props": {
+"frame": "deco_counter_0"
+}
+},
+{
+"type": "deco",
+"x": 11,
+"y": 6,
+"props": {
+"frame": "deco_shelf_0"
+}
+},
+{
+"type": "deco",
+"x": 14,
+"y": 6,
+"props": {
+"frame": "deco_shelf_0"
+}
+},
+{
+"type": "deco",
+"x": 21,
+"y": 9,
+"props": {
+"frame": "deco_waterfall_0"
+}
+},
+{
+"type": "deco",
+"x": 25,
+"y": 9,
+"props": {
+"frame": "chalk_good_coffee_0"
+}
+},
+{
+"type": "talk",
+"x": 4,
+"y": 4,
+"w": 2,
+"h": 6,
+"props": {
+"text": "\u00a1BUENOS D\u00cdAS, CAF\u00c9!",
+"voice": "hola",
+"ms": 1400
+}
+},
+{
+"type": "talk",
+"x": 24,
+"y": 4,
+"w": 2,
+"h": 6,
+"props": {
+"text": "\u00a1ZUCKER! NICHT ANFASSEN.",
+"voice": "ay",
+"ms": 1400
+}
+},
+{
+"type": "warp",
+"x": 31,
+"y": 9,
+"props": {
+"id": "p1",
+"target": "p2",
+"kind": "pipe"
+}
+},
+{
+"type": "deco",
+"x": 31,
+"y": 6,
+"props": {
+"frame": "deco_arrow_0"
+}
+},
+{
+"type": "deco",
+"x": 31,
+"y": 9,
+"props": {
+"frame": "deco_shelf_0",
+"fg": true,
+"scale": 1.3
+}
+},
+{
+"type": "section",
+"x": 42,
+"y": 0,
+"w": 2,
+"h": 14,
+"props": {
+"track": "coffee"
+}
+},
+{
+"type": "talk",
+"x": 44,
+"y": 4,
+"w": 2,
+"h": 6,
+"props": {
+"text": "HANTEL = ZIEGEL DURCHBRECHEN!",
+"voice": "si",
+"ms": 1600
+}
+},
+{
+"type": "conveyor",
+"x": 60,
+"y": 10,
+"w": 12,
+"h": 1,
+"props": {
+"speed": 90
+}
+},
+{
+"type": "conveyor",
+"x": 78,
+"y": 10,
+"w": 6,
+"h": 1,
+"props": {
+"speed": -110
+}
+},
+{
+"type": "moveplat",
+"x": 86,
+"y": 6,
+"props": {
+"frame": "plat_cup_0",
+"vertical": true,
+"range": 64,
+"speed": 50
+}
+},
+{
+"type": "deco",
+"x": 96,
+"y": 9,
+"props": {
+"frame": "deco_cup_big_0",
+"scale": 2,
+"id": "bigcup"
+}
+},
+{
+"type": "tipcup",
+"x": 92,
+"y": 6,
+"w": 2,
+"h": 4,
+"props": {
+"deco": "bigcup",
+"rx": 100,
+"ry": 7,
+"angle": 70
+}
+},
+{
+"type": "deco",
+"x": 124,
+"y": 6,
+"props": {
+"frame": "deco_shelf_0"
+}
+},
+{
+"type": "deco",
+"x": 128,
+"y": 9,
+"props": {
+"frame": "chalk_better_people_0"
+}
+},
+{
+"type": "section",
+"x": 134,
+"y": 0,
+"w": 2,
+"h": 14,
+"props": {
+"track": "coffee_finale"
+}
+},
+{
+"type": "conveyor",
+"x": 140,
+"y": 10,
+"w": 21,
+"h": 1,
+"props": {
+"speed": -120
+}
+},
+{
+"type": "talk",
+"x": 140,
+"y": 4,
+"w": 2,
+"h": 6,
+"props": {
+"text": "\u00a1DAS BAND! GEGEN DEN STROM.",
+"voice": "ay",
+"ms": 1400
+}
+},
+{
+"type": "deco",
+"x": 171,
+"y": 9,
+"props": {
+"frame": "deco_machine_0"
+}
+},
+{
+"type": "deco",
+"x": 167,
+"y": 9,
+"props": {
+"frame": "deco_waterfall_0"
+}
+},
+{
+"type": "talk",
+"x": 166,
+"y": 4,
+"w": 2,
+"h": 6,
+"props": {
+"text": "\u00a1GRACIAS, CAF\u00c9!",
+"voice": "gracias",
+"ms": 1400
+}
+},
+{
+"type": "warp",
+"x": 178,
+"y": 9,
+"props": {
+"id": "p2",
+"target": "p1",
+"kind": "pipe"
+}
+},
+{
+"type": "warp",
+"x": 196,
+"y": 9,
+"props": {
+"id": "p3",
+"target": "p1",
+"kind": "pipe"
+}
+},
+{
+"type": "deco",
+"x": 193,
+"y": 5,
+"props": {
+"frame": "deco_shelf_0"
+}
+}
+]

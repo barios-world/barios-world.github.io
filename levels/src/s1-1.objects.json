@@ -1,0 +1,201 @@
+[
+{
+"type": "deco",
+"x": 4,
+"y": 9,
+"props": {
+"frame": "deco_carpet_0"
+}
+},
+{
+"type": "deco",
+"x": 19,
+"y": 9,
+"props": {
+"frame": "chalk_good_people_0"
+}
+},
+{
+"type": "talk",
+"x": 5,
+"y": 4,
+"w": 2,
+"h": 6,
+"props": {
+"text": "\u00a1HOLA, BOULEVARD!",
+"voice": "hola",
+"ms": 1400
+}
+},
+{
+"type": "deco",
+"x": 31,
+"y": 9,
+"props": {
+"frame": "deco_column_0",
+"fg": true
+}
+},
+{
+"type": "deco",
+"x": 35,
+"y": 9,
+"props": {
+"frame": "chalk_crazy_times_0"
+}
+},
+{
+"type": "section",
+"x": 40,
+"y": 0,
+"w": 2,
+"h": 14,
+"props": {
+"track": "boulevard"
+}
+},
+{
+"type": "talk",
+"x": 59,
+"y": 4,
+"w": 2,
+"h": 6,
+"props": {
+"text": "STAMPF: STICK RUNTER + WURF!",
+"voice": "si",
+"ms": 1600
+}
+},
+{
+"type": "deco",
+"x": 65,
+"y": 9,
+"props": {
+"frame": "deco_busstop_0"
+}
+},
+{
+"type": "warp",
+"x": 67,
+"y": 9,
+"props": {
+"id": "p1",
+"target": "p2",
+"kind": "pipe"
+}
+},
+{
+"type": "deco",
+"x": 67,
+"y": 6,
+"props": {
+"frame": "deco_arrow_0"
+}
+},
+{
+"type": "talk",
+"x": 77,
+"y": 4,
+"w": 2,
+"h": 6,
+"props": {
+"text": "\u00a1AY, EINE PARADE!",
+"voice": "ay",
+"ms": 1400
+}
+},
+{
+"type": "parade",
+"x": 116,
+"y": 9,
+"props": {
+"dir": -1,
+"every": 2600,
+"until": 77,
+"variant": "basic"
+}
+},
+{
+"type": "deco",
+"x": 104,
+"y": 9,
+"props": {
+"frame": "deco_column_0",
+"fg": true
+}
+},
+{
+"type": "section",
+"x": 123,
+"y": 0,
+"w": 2,
+"h": 14,
+"props": {
+"track": "boulevard_finale"
+}
+},
+{
+"type": "deco",
+"x": 158,
+"y": 9,
+"props": {
+"frame": "deco_door_gold_0"
+}
+},
+{
+"type": "deco",
+"x": 149,
+"y": 9,
+"props": {
+"frame": "chalk_crazy_times_0"
+}
+},
+{
+"type": "deco",
+"x": 161,
+"y": 9,
+"props": {
+"frame": "sign_coffee_0"
+}
+},
+{
+"type": "talk",
+"x": 152,
+"y": 4,
+"w": 2,
+"h": 6,
+"props": {
+"text": "\u00a1GRACIAS, BOULEVARD!",
+"voice": "gracias",
+"ms": 1400
+}
+},
+{
+"type": "warp",
+"x": 168,
+"y": 9,
+"props": {
+"id": "p2",
+"target": "p1",
+"kind": "pipe"
+}
+},
+{
+"type": "warp",
+"x": 186,
+"y": 9,
+"props": {
+"id": "p3",
+"target": "p1",
+"kind": "pipe"
+}
+},
+{
+"type": "deco",
+"x": 172,
+"y": 8,
+"props": {
+"frame": "chalk_cambio_0"
+}
+}
+]

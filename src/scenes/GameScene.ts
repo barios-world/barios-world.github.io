@@ -8,14 +8,17 @@ import { Mob, type Variant } from '../entities/Mob';
 import { Block } from '../entities/Block';
 import { Cup, Wave, HomingCard, Pacifier, Glasses, Crystal, RainCup } from '../entities/Projectiles';
 import { Direktor } from '../entities/Direktor';
-import { Puddle, Vent, Ball, BallSpawner, CardPlatform, MovingPlatform } from '../entities/Hazards';
+import { Puddle, Vent, Ball, BallSpawner, CardPlatform, MovingPlatform, OrbitPad, Conveyor } from '../entities/Hazards';
 import { LEVELS, nextLevel } from '../data/levels';
 import { worldOf } from '../data/worlds';
 import { FORMS, SPECIALS, isForm, isSpecial, type Form, type Special } from '../data/forms';
 import { UPGRADES } from '../data/upgrades';
 
 type Obj = Phaser.Types.Tilemaps.TiledObject;
-type Overlay = { kind: 'result' | 'gameover'; lines: string[]; hint: string } | null;
+type Overlay = { kind: 'result' | 'gameover'; lines: string[]; hint: string; hand?: { cards: number; royals: number } } | null;
+interface Warp { id: string; x: number; y: number; target: string; kind: 'pipe' | 'door' }
+interface Parade { x: number; y: number; dir: number; every: number; until: number; variant: Variant; next: number; alive: Mob[] }
+interface Trigger { rect: Phaser.Geom.Rectangle; fired: boolean; kind: string; props: Record<string, unknown> }
 const prop = (o: Obj, name: string) => (((o as any).properties ?? []) as { name: string; value: unknown }[]).find((p) => p.name === name)?.value;
 
 export class GameScene extends Phaser.Scene {
@@ -82,6 +85,15 @@ export class GameScene extends Phaser.Scene {
   private bubbles: { c: Phaser.GameObjects.Container; target: { body: { center: { x: number }; top: number } } }[] = [];
   thankUntil = 0;
   stompChain = 0;
+  /** Season 1 set-piece systems */
+  warps: Warp[] = [];
+  private warpArmed = true;
+  private warpCooldown = 0;
+  parades: Parade[] = [];
+  conveyors: Conveyor[] = [];
+  orbits: OrbitPad[] = [];
+  triggers: Trigger[] = [];
+  decos: Record<string, Phaser.GameObjects.Image> = {};
 
   constructor() { super('game'); }
 
@@ -110,6 +122,8 @@ export class GameScene extends Phaser.Scene {
     this.bubbles = [];
     this.thankUntil = 0;
     this.stompChain = 0;
+    this.warps = []; this.parades = []; this.conveyors = []; this.orbits = []; this.triggers = []; this.decos = {};
+    this.warpArmed = true; this.warpCooldown = 0;
     this.registry.set('bossHp', -1);
     if (save.settings.reduceFx) {
       // Barrierefreiheit: keine Blitze, kein Wackeln (Hitstop entfaellt in hitstop()).
@@ -224,8 +238,53 @@ export class GameScene extends Phaser.Scene {
         case 'vent': this.vents.add(new Vent(this, x, y)); break;
         case 'ballspawner': this.spawners.push(new BallSpawner(x, y, T.BALL_EVERY)); this.add.image(x, y, 'spr', 'haz_ball_0').setAlpha(0.35).setDepth(-1); break;
         case 'cardplat': this.solids.add(new CardPlatform(this, x, y, (prop(o, 'phase') as number) ?? 0)); break;
-        case 'moveplat': this.movers.add(new MovingPlatform(this, x, y, 96, 60, !!prop(o, 'vertical'))); break;
-        case 'deco': this.add.image(x, y, 'spr', (prop(o, 'frame') as string) ?? 'bush_0').setOrigin(0.5, 1).setDepth(-1); break;
+        case 'moveplat': this.movers.add(new MovingPlatform(this, x, y, (prop(o, 'range') as number) ?? 96, (prop(o, 'speed') as number) ?? 60, !!prop(o, 'vertical'), (prop(o, 'frame') as string) ?? 'plat_move_0')); break;
+        case 'deco': {
+          const fg = !!prop(o, 'fg');
+          // foreground props scroll a little faster than the world; pre-shift them so they sit where they were placed when on screen
+          const px = fg ? x + 0.15 * (x - GAME_H * 0.9) : x;
+          const img = this.add.image(px, y, 'spr', (prop(o, 'frame') as string) ?? 'bush_0').setOrigin(0.5, 1)
+            .setDepth((prop(o, 'depth') as number) ?? (fg ? 15 : -1)).setScale((prop(o, 'scale') as number) ?? 1).setFlipX(!!prop(o, 'flipX'));
+          if (fg) img.setScrollFactor(1.15, 1).setAlpha(0.92);
+          const id = prop(o, 'id') as string | undefined;
+          if (id) this.decos[id] = img;
+          break;
+        }
+        case 'warp': {
+          const kind = ((prop(o, 'kind') as string) ?? 'pipe') as 'pipe' | 'door';
+          if (kind === 'pipe') {
+            const p = this.solids.create(x, y, 'spr', 'pipe_big_0') as Phaser.Physics.Arcade.Sprite;
+            p.setOrigin(0.5, 1).setDepth(2);
+            (p.body as Phaser.Physics.Arcade.StaticBody).setSize(32, 64).setOffset(0, 0);
+            p.refreshBody();
+            this.warps.push({ id: prop(o, 'id') as string, x, y: y - 64, target: prop(o, 'target') as string, kind });
+          } else {
+            this.add.image(x, y, 'spr', (prop(o, 'frame') as string) ?? 'deco_joker_door_0').setOrigin(0.5, 1).setDepth(-1);
+            this.warps.push({ id: prop(o, 'id') as string, x, y, target: prop(o, 'target') as string, kind });
+          }
+          break;
+        }
+        case 'parade':
+          this.parades.push({ x, y, dir: (prop(o, 'dir') as number) ?? -1, every: (prop(o, 'every') as number) ?? 2200, until: ((prop(o, 'until') as number) ?? 0) * 32, variant: ((prop(o, 'variant') as Variant) ?? 'basic'), next: 0, alive: [] });
+          break;
+        case 'conveyor': this.conveyors.push(new Conveyor(this, x, y, o.width ?? 64, (prop(o, 'speed') as number) ?? 90)); break;
+        case 'orbit': {
+          const n = (prop(o, 'n') as number) ?? 4, radius = (prop(o, 'radius') as number) ?? 80, speed = (prop(o, 'speed') as number) ?? 40;
+          const cy = y - 16;
+          if (prop(o, 'hub') !== false) {
+            const hub = this.solids.create(x, cy, 'spr', 'plat_move_0') as Phaser.Physics.Arcade.Sprite;
+            hub.setDepth(3); (hub.body as Phaser.Physics.Arcade.StaticBody).setSize(64, 14).setOffset(0, 0); hub.refreshBody();
+            this.add.image(x, cy + 6, 'spr', 'deco_roulette_0').setDepth(-2).setAlpha(0.9);
+          }
+          for (let i = 0; i < n; i++) { const pad = new OrbitPad(this, x, cy, radius, i * 360 / n, speed); this.orbits.push(pad); this.movers.add(pad); }
+          break;
+        }
+        case 'storm': case 'talk': case 'section': case 'tipcup': {
+          const props: Record<string, unknown> = {};
+          for (const p of ((o as any).properties ?? []) as { name: string; value: unknown }[]) props[p.name] = p.value;
+          this.triggers.push({ rect: new Phaser.Geom.Rectangle(x, y, o.width ?? 32, o.height ?? 32), fired: false, kind: type, props });
+          break;
+        }
         case 'bush': this.add.image(x, y, 'spr', 'bush_0').setOrigin(0.5, 1).setDepth(-1); break;
         case 'palm': this.add.image(x, y, 'spr', 'palm_0').setOrigin(0.45, 1).setDepth(-1); break;
         case 'sign': this.add.image(x, y, 'spr', 'sign_0').setOrigin(0.5, 1).setDepth(-1); break;
@@ -262,15 +321,7 @@ export class GameScene extends Phaser.Scene {
     this.player.onAttack = (form, x, y, dir) => this.attack(form, x, y, dir);
 
     // --- mobs
-    for (const [x, y, variant] of mobDefs) {
-      const m = new Mob(this, x, y, this.ground, save.settings.assist ? 0.7 : 1, variant);
-      m.onShout = (sx, sy, dir) => this.waves.add(new Wave(this, sx, sy, dir, 'mob'));
-      m.onThrow = (sx, sy, vx, vy) => this.pacifiers.add(new Pacifier(this, sx, sy, vx, vy));
-      m.onDrum = () => this.drumBeat();
-      m.onSay = (text) => this.say(m, text, 'baby');
-      this.mobs.push(m);
-      this.mobGroup.add(m);
-    }
+    for (const [x, y, variant] of mobDefs) this.wireMob(new Mob(this, x, y, this.ground, save.settings.assist ? 0.7 : 1, variant));
 
     // --- boss wiring
     if (this.boss) {
@@ -369,10 +420,11 @@ export class GameScene extends Phaser.Scene {
     audio.play(TRACKS[theme.track]);
     this.game.events.on(Phaser.Core.Events.HIDDEN, this.onHidden, this);
     this.events.once('shutdown', () => this.game.events.off(Phaser.Core.Events.HIDDEN, this.onHidden, this));
-    this.events.emit('msg', level.name, 1500);
+    if (level.motto) this.time.delayedCall(250, () => this.events.emit('intro', { name: level.name.replace(/^\S+\s+/, ''), motto: level.motto }));
+    else this.events.emit('msg', level.name, 1500);
     this.time.delayedCall(700, () => { if (!this.player.dead && !this.finished) { audio.say('bario', 'vamos'); this.say(this.player, '¡VAMOS!', 'bario'); } });
     if (this.solids.getChildren().some((s) => s instanceof CardPlatform)) this.time.delayedCall(2200, () => this.events.emit('msg', 'KARTE BLINKT = GLEICH OFFEN!', 1600));
-    else if (this.levelKey === 'lvl_w1_1' || this.levelKey === 'lvl_w1_2') this.time.delayedCall(2400, () => this.events.emit('msg', 'TIPP: IN DER LUFT  RUNTER + WURF\n= STAMPF!', 1900));
+    else if (this.levelKey === 'lvl_s1_1') this.time.delayedCall(2400, () => this.events.emit('msg', 'TIPP: IN DER LUFT  RUNTER + WURF\n= STAMPF!', 1900));
     this.events.emit('overlay', null);
     this.input.on('pointerdown', this.onTapOverlay, this);
     this.input.keyboard?.on('keydown-SPACE', this.onTapOverlay, this);
@@ -788,6 +840,123 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.shake(60, 0.002);
   }
 
+  // ------------------------------------------------------------ Season 1 set pieces
+  private wireMob(m: Mob) {
+    m.onShout = (sx, sy, dir) => this.waves.add(new Wave(this, sx, sy, dir, 'mob'));
+    m.onThrow = (sx, sy, vx, vy) => this.pacifiers.add(new Pacifier(this, sx, sy, vx, vy));
+    m.onDrum = () => this.drumBeat();
+    m.onSay = (text) => this.say(m, text, 'baby');
+    this.mobs.push(m);
+    this.mobGroup.add(m);
+    return m;
+  }
+
+  /** Parade spawners release walkers while they are near the screen (max 6 on stage each). */
+  private runParades(now: number) {
+    const view = this.cameras.main.worldView;
+    for (const p of this.parades) {
+      if (now < p.next || Math.abs(p.x - view.centerX) > view.width) continue;
+      p.next = now + p.every;
+      p.alive = p.alive.filter((m) => !m.gone && m.alive);
+      if (p.alive.length >= 6) continue;
+      const m = this.wireMob(new Mob(this, p.x, p.y, this.ground, save.settings.assist ? 0.7 : 1, p.variant));
+      m.parade = p.dir; m.dir = p.dir; m.despawnX = p.until;
+      p.alive.push(m);
+    }
+  }
+
+  /** Stand on a pipe (or in front of a door) and push the stick down. */
+  private runWarps(delta: number) {
+    this.warpCooldown = Math.max(0, this.warpCooldown - delta);
+    if (this.inputSys.axisY < 0.5) { this.warpArmed = true; return; }
+    if (!this.warpArmed || !this.player.grounded || this.warpCooldown > 0 || this.player.dead) return;
+    const b = this.player.body;
+    const w = this.warps.find((wp) => Math.abs(b.center.x - wp.x) < 16 && Math.abs(b.bottom - wp.y) < 6);
+    if (!w) return;
+    const target = this.warps.find((t) => t.id === w.target);
+    if (!target) return;
+    this.warpArmed = false;
+    this.warpCooldown = 1500;
+    audio.warp();
+    this.player.controlLock = 600;
+    this.player.body.setVelocity(0, 0);
+    const cam = this.cameras.main;
+    cam.fadeOut(180, 15, 13, 12);
+    this.time.delayedCall(200, () => {
+      this.player.spawnAt(target.x, target.y);
+      this.player.controlLock = 250;
+      cam.centerOn(target.x, target.y);
+      cam.fadeIn(200, 15, 13, 12);
+      if (target.kind === 'pipe') this.dust.emitParticleAt(target.x, target.y, 8);
+    });
+  }
+
+  private runTriggers() {
+    const b = this.player.body;
+    const pr = new Phaser.Geom.Rectangle(b.x, b.y, b.width, b.height);
+    for (const t of this.triggers) {
+      if (t.fired || !Phaser.Geom.Rectangle.Overlaps(t.rect, pr)) continue;
+      t.fired = true;
+      this.fireTrigger(t);
+    }
+  }
+
+  private fireTrigger(t: Trigger) {
+    const p = t.props;
+    switch (t.kind) {
+      case 'talk':
+        if (p.voice) audio.say('bario', p.voice as string);
+        this.say(this.player, p.text as string, 'bario', (p.ms as number) ?? 1300);
+        break;
+      case 'section':
+        if (TRACKS[p.track as string]) audio.play(TRACKS[p.track as string]);
+        break;
+      case 'storm': {
+        const count = (p.count as number) ?? 8, every = (p.every as number) ?? 1300;
+        const variants = ((p.variants as string) ?? 'basic,basic,fanblock,trommler').split(',') as Variant[];
+        audio.storm();
+        this.cameras.main.shake(300, 0.008);
+        this.events.emit('msg', (p.text as string) ?? 'DER FANBLOCK KOMMT!', 1500);
+        audio.say('bario', 'ay'); this.say(this.player, '¡AY, NO!', 'bario');
+        const groundY = t.rect.bottom;
+        for (let i = 0; i < count; i++) {
+          this.time.delayedCall(600 + i * every, () => {
+            if (this.finished) return;
+            const view = this.cameras.main.worldView;
+            const m = this.wireMob(new Mob(this, view.right + 40, groundY, this.ground, save.settings.assist ? 0.7 : 1, variants[i % variants.length]));
+            m.aggro = true; m.dir = -1;
+          });
+        }
+        break;
+      }
+      case 'tipcup': {
+        const cup = this.decos[p.deco as string];
+        audio.tip();
+        this.cameras.main.shake(500, 0.006);
+        audio.say('bario', 'ay'); this.say(this.player, '¡AY, MI CAFÉ!', 'bario');
+        if (cup) this.tweens.add({ targets: cup, angle: (p.angle as number) ?? 70, duration: 1100, ease: 'Bounce.out' });
+        this.time.delayedCall(900, () => {
+          if (!cup) return;
+          for (let i = 0; i < 24; i++) this.time.delayedCall(i * 60, () => this.steam.emitParticleAt(cup.x + 40 + Phaser.Math.Between(-10, 10), cup.y - 60, 2));
+          if (p.rx !== undefined) this.addCard(((p.rx as number) + 0.5) * 32, ((p.ry as number) + 0.5) * 32, true, true);
+        });
+        break;
+      }
+    }
+  }
+
+  /** A collectable card (also spawned by set pieces). */
+  addCard(x: number, y: number, royal: boolean, countIt = false) {
+    const frame = royal ? 'it_karte_gelb_0' : ['it_karte_0', 'it_karte_blau_0', 'it_karte_gruen_0'][Math.floor(x / 32) % 3];
+    const c = this.cards.create(x, y, 'spr', frame) as Phaser.Physics.Arcade.Sprite;
+    c.setData('value', royal ? 10 : 1).setData('royal', royal).setDepth(4);
+    (c.body as Phaser.Physics.Arcade.StaticBody).setSize(18, 22).setOffset(3, 1);
+    this.tweens.add({ targets: c, y: y - 4, duration: 520 + ((x / 32) % 4) * 70, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    if (royal) this.tweens.add({ targets: c, angle: 8, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    if (countIt) { this.totalCards += royal ? 10 : 1; this.sparks.emitParticleAt(x, y, 12); }
+    return c;
+  }
+
   // ------------------------------------------------------------ voice, bubbles, Stampf
   /** Comic speech bubble above a speaker (Bario, Meistersager, Direktor); follows them while visible. */
   say(target: { body: { center: { x: number }; top: number } }, text: string, who: 'bario' | 'baby' | 'boss', ms = who === 'boss' ? 1500 : 900, big = who === 'boss') {
@@ -1083,7 +1252,7 @@ export class GameScene extends Phaser.Scene {
         ? { kind: 'result', lines: ['BOSS RUSH!', '', `ZEIT     ${secs.toFixed(1)}s`, rush.isNew ? 'NEUE BESTZEIT!' : `BEST     ${rush.best.toFixed(1)}s`, 'ER VERLIERT IHN NIE...'], hint: 'TIPPEN  -  ZURUECK ZUM ANFANG' }
         : this.boss
         ? { kind: 'result', lines: ['LEGENDE!', '', 'END OF THE LEVEL.', 'BEGINNING OF A LEGEND.', `ZEIT     ${secs.toFixed(1)}s`], hint: 'TIPPEN  -  ZURUECK ZUM ANFANG' }
-        : { kind: 'result', lines: ['CAMBIO!', '', `KARTEN   ${cards} / ${this.totalCards}`, `ZEIT     ${secs.toFixed(1)}s${newBest ? '  NEU!' : ''}`, noDmg ? 'OHNE SCHADEN  +500' : royals ? `ROYALS   ${royals}` : ''], hint: 'TIPPEN FUER WEITER' };
+        : { kind: 'result', lines: ['CAMBIO!', '', `KARTEN   ${cards} / ${this.totalCards}`, `ZEIT     ${secs.toFixed(1)}s${newBest ? '  NEU!' : ''}`, noDmg ? 'OHNE SCHADEN  +500' : royals ? `ROYALS   ${royals}` : ''], hint: 'TIPPEN FUER WEITER', hand: { cards, royals } };
       this.events.emit('overlay', this.overlay);
     });
   }
@@ -1168,7 +1337,17 @@ export class GameScene extends Phaser.Scene {
         audio.bump();
       }
     }
-    this.movers.getChildren().forEach((p) => (p as MovingPlatform).tick());
+    this.movers.getChildren().forEach((p) => { if (p instanceof MovingPlatform) p.tick(); });
+    for (const op of this.orbits) op.tick(dt);
+    for (const c of this.conveyors) {
+      c.tick(dt);
+      if (c.carries(this.player.body)) this.player.body.x += c.speed * dt;
+      for (const m of this.mobs) if (m.alive && c.carries(m.body)) m.body.x += c.speed * dt;
+    }
+    this.runParades(now);
+    this.runTriggers();
+    this.runWarps(delta);
+    if (this.mobs.some((m) => m.gone)) this.mobs = this.mobs.filter((m) => !m.gone);
     if (this.boss) {
       if (!this.player.dead) this.boss.update(dt * this.worldScale * (save.settings.assist ? 0.85 : 1), this.player);
       this.registry.set('bossHp', this.boss.hp);

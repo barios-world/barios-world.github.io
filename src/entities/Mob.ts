@@ -29,6 +29,12 @@ export class Mob extends Phaser.Physics.Arcade.Sprite {
   onDrum?: () => void;
   /** baby talk in a bubble (GameScene draws it) */
   onSay?: (text: string) => void;
+  /** parade walker: fixed direction, never notices, vanishes past despawnX */
+  parade = 0;
+  despawnX?: number;
+  /** storm runner: charges from the start and never gives up */
+  aggro = false;
+  gone = false;
   speedMul = 1;
   /** temporary buff from a Fahnentraeger / Trommler beat */
   buff = 1;
@@ -97,6 +103,13 @@ export class Mob extends Phaser.Physics.Arcade.Sprite {
 
     switch (this.state) {
       case 'patrol':
+        if (this.parade) {
+          this.dir = this.parade;
+          b.setVelocityX(this.dir * T.MOB_WALK * 1.4 * mul);
+          if (this.despawnX !== undefined && (this.parade > 0 ? this.x > this.despawnX : this.x < this.despawnX)) { this.despawn(); return; }
+          break;
+        }
+        if (this.aggro && !player.dead) { this.state = 'run'; break; }
         if (b.blocked.left) this.dir = 1;
         else if (b.blocked.right) this.dir = -1;
         else if (grounded && this.ledgeAhead()) this.dir = -this.dir;
@@ -115,7 +128,7 @@ export class Mob extends Phaser.Physics.Arcade.Sprite {
         else if (grounded && this.ledgeAhead()) b.setVelocityX(0);
         else b.setVelocityX(this.dir * T.MOB_RUN * mul);
         if (!conf && ady < 70 && (keepDist ? adx < keepDist + 40 : adx < T.MOB_ATTACK_RANGE)) { this.state = 'attack'; this.timer = T.MOB_TELEGRAPH; b.setVelocityX(0); audio.say('baby', 'waeh'); this.onSay?.(this.variant === 'nuckel' ? 'DADA!' : 'WÄÄH!'); }
-        else if (adx > T.MOB_LOSE || player.dead || conf) this.state = 'patrol';
+        else if (!this.aggro && (adx > T.MOB_LOSE || player.dead || conf)) this.state = 'patrol';
         break;
       case 'attack':
         b.setVelocityX(0);
@@ -255,8 +268,17 @@ export class Mob extends Phaser.Physics.Arcade.Sprite {
     this.scene.time.delayedCall(T.MOB_RESPAWN_MS, () => this.respawn());
   }
 
+  /** Parade walkers leave the stage for good. */
+  despawn() {
+    this.state = 'dead'; this.gone = true;
+    this.body.enable = false;
+    this.prop?.destroy(); this.extra.forEach((e) => e.destroy());
+    this.gfx.destroy();
+    this.destroy();
+  }
+
   respawn() {
-    if (!this.scene) return;
+    if (!this.scene || this.gone) return;
     this.state = 'patrol';
     this.dir = -1;
     this.confusedUntil = 0;

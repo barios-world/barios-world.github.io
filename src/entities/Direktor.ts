@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { T } from '../config/Tuning';
 import { audio } from '../systems/Audio';
 
-export type BossState = 'intro' | 'idle' | 'walk' | 'tele_glasses' | 'tele_kick' | 'dash' | 'kick' | 'open' | 'tele_rain' | 'rain'
+export type BossState = 'intro' | 'intro_jump' | 'idle' | 'walk' | 'tele_glasses' | 'tele_kick' | 'dash' | 'kick' | 'open' | 'tele_rain' | 'rain'
   | 'tele_crystal' | 'crystal' | 'tele_slam' | 'slam' | 'teleport' | 'transition' | 'stunned' | 'dead';
 
 /** Der Direktor – final boss. Three phases, telegraphed attacks, a short open window after every combo.
@@ -25,6 +25,7 @@ export class Direktor extends Phaser.Physics.Arcade.Sprite {
   crystalIdx = 0;
   assist = false;
   private slamAir = false;
+  private firstAttack = true;
   private hitSayAt = 0;
   onGlasses?: (x: number, y: number, dir: number) => void;
   onKick?: (x: number, y: number, dir: number) => void;
@@ -53,7 +54,7 @@ export class Direktor extends Phaser.Physics.Arcade.Sprite {
   get alive() { return this.state !== 'dead'; }
   /** Bario can hurt him now. */
   get vulnerable() { return this.state === 'open' || this.state === 'stunned' || (this.assist && (this.state === 'idle' || this.state === 'walk')); }
-  get harmless() { return this.state === 'open' || this.state === 'stunned' || this.state === 'teleport' || this.state === 'transition' || this.state === 'dead' || this.state === 'intro'; }
+  get harmless() { return this.state === 'open' || this.state === 'stunned' || this.state === 'teleport' || this.state === 'transition' || this.state === 'dead' || this.state === 'intro' || this.state === 'intro_jump'; }
 
   private speedMul() { return this.phase === 3 ? 1.5 : this.phase === 2 ? 1.2 : 1; }
   private tele(ms: number) { return ms / this.speedMul(); }
@@ -80,7 +81,10 @@ export class Direktor extends Phaser.Physics.Arcade.Sprite {
     switch (this.state) {
       case 'intro':
         b.setVelocityX(0);
-        if (this.timer <= 0) { this.sayLine('ruhe', 'RUHE IM SPIEL,\nCHAOS IM KOPF.'); this.go('idle', 900); }
+        if (this.timer <= 0) { this.sayLine('ruhe', 'RUHE IM SPIEL,\nCHAOS IM KOPF.'); this.go('intro_jump', 2500); b.setVelocity(this.dir * 150, -430); }
+        break;
+      case 'intro_jump':
+        if ((b.blocked.down && this.timer < 2300) || this.timer <= 0) { b.setVelocityX(0); this.go('idle', 700); }
         break;
       case 'idle':
         b.setVelocityX(0);
@@ -195,6 +199,7 @@ export class Direktor extends Phaser.Physics.Arcade.Sprite {
 
   /** Pick the next pattern based on phase and distance. */
   private choose(adx: number, afterWalk = false) {
+    if (this.firstAttack) { this.firstAttack = false; this.sayLine('brille', 'BRILLE!'); this.go('tele_glasses', 600); return; }
     const r = Math.random();
     if (this.phase === 3 && r < 0.3) { audio.teleport(); this.go('teleport', 300); this.scene.tweens.add({ targets: this.gfx, alpha: 0, duration: 250 }); return; }
     if (this.phase >= 2 && r < 0.6) {
@@ -212,7 +217,7 @@ export class Direktor extends Phaser.Physics.Arcade.Sprite {
   private animate() {
     const g = this.gfx;
     switch (this.state) {
-      case 'walk': case 'dash':
+      case 'walk': case 'dash': case 'intro_jump':
         if (g.anims.currentAnim?.key !== 'direktor_walk' || !g.anims.isPlaying) g.play('direktor_walk', true);
         g.setOrigin(0.5, 58 / 64);
         break;

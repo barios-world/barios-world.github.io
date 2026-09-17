@@ -98,6 +98,20 @@ for (const f of files) {
     }
   }
 
+  // rich objects from an optional sidecar: levels/src/<name>.objects.json  [{type, x, y, w?, h?, props?}] in tile units.
+  // Point objects anchor at the bottom centre of their tile (like decor); zones are rectangles.
+  const side = path.join(SRC, f.replace(/\.txt$/, '.objects.json'));
+  if (fs.existsSync(side)) {
+    const extra = JSON.parse(fs.readFileSync(side, 'utf8')) as { type: string; x: number; y: number; w?: number; h?: number; props?: Record<string, unknown> }[];
+    for (const e of extra) {
+      const properties = Object.entries(e.props ?? {}).map(([name, value]) => ({
+        name, value, type: typeof value === 'number' ? (Number.isInteger(value) ? 'int' : 'float') : typeof value === 'boolean' ? 'bool' : 'string',
+      }));
+      if (e.w !== undefined) obj(e.type, e.x * TS, e.y * TS, { width: e.w * TS, height: (e.h ?? 1) * TS, point: false, properties });
+      else obj(e.type, e.x * TS + TS / 2, (e.y + 1) * TS, { properties });
+    }
+  }
+
   const map = {
     type: 'map', version: '1.10', tiledversion: '1.11.0', orientation: 'orthogonal', renderorder: 'right-down',
     width: w, height: h, tilewidth: TS, tileheight: TS, infinite: false, nextlayerid: 4, nextobjectid: oid,

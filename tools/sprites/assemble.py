@@ -156,6 +156,78 @@ def assemble(include_scenes=True):
     belt = G(30, 14); belt.rect(0, 3, 29, 10, '#'); belt.rect(9, 1, 20, 12, 'G'); belt.rect(11, 3, 18, 10, 'L'); belt.set(14, 6, 'R'); belt.set(15, 6, 'R'); belt.outline('K'); add('it_guertel', belt)
     drum = G(20, 16); drum.rect(2, 4, 17, 15, 'R'); drum.rect(2, 4, 17, 6, 'O'); drum.rect(2, 13, 17, 15, 'r'); drum.vline(6, 6, 13, 'O'); drum.vline(13, 6, 13, 'O'); drum.outline('K'); add('prop_drum', drum)
 
+    # --- Season 1 decor & props
+    import math as _m
+    door = G(48, 64)
+    door.rect(0, 6, 47, 63, 'g'); door.rect(3, 9, 44, 63, 'G'); door.rect(6, 12, 22, 63, 'L'); door.rect(25, 12, 41, 63, 'L')
+    door.rect(8, 14, 20, 34, 'G'); door.rect(27, 14, 39, 34, 'G'); door.rect(8, 38, 20, 58, 'G'); door.rect(27, 38, 39, 58, 'G')
+    door.rect(21, 40, 22, 43, 'K'); door.rect(25, 40, 26, 43, 'K')
+    door.rect(17, 2, 30, 6, 'G'); door.set(18, 0, 'G'); door.set(23, 0, 'G'); door.set(29, 0, 'G'); door.set(19, 1, 'G'); door.set(24, 1, 'G'); door.set(28, 1, 'G'); door.set(23, 3, 'R')
+    door.outline('K'); add('deco_door_gold', door)
+    col = G(32, 80)
+    col.rect(4, 6, 27, 79, 'X'); col.rect(6, 8, 25, 77, 'o'); col.rect(2, 0, 29, 7, 'X'); col.rect(4, 1, 27, 5, 'o')
+    col.rect(8, 12, 23, 30, 'P'); col.rect(9, 13, 22, 29, 'Q'); _dt(col, 10, 16, 'BAR', 'K'); _dt(col, 10, 22, 'IOS', 'K')
+    col.rect(8, 36, 23, 52, 'I'); col.rect(9, 37, 22, 51, 'Y'); _dt(col, 10, 40, 'CAF', 'J'); _dt(col, 13, 46, 'E', 'J')
+    col.rect(8, 58, 23, 74, 'A'); col.rect(9, 59, 22, 73, 'F'); _dt(col, 10, 62, 'CAM', 'K'); _dt(col, 10, 68, 'BIO', 'K')
+    col.outline('K'); add('deco_column', col)
+    bus = G(48, 64)
+    bus.rect(0, 0, 47, 6, 'R'); bus.hline(1, 46, 1, 'V'); bus.rect(2, 7, 4, 63, 'X'); bus.rect(43, 7, 45, 63, 'X')
+    bus.rect(5, 8, 42, 50, 'U'); bus.rect(6, 9, 41, 49, 'T'); bus.rect(8, 44, 40, 48, 'w'); bus.rect(8, 49, 10, 56, 'j'); bus.rect(38, 49, 40, 56, 'j')
+    bus.rect(17, 12, 31, 22, 'G'); _dt(bus, 18, 15, 'BUS', 'K'); bus.outline('K'); add('deco_busstop', bus)
+    counter = G(96, 50)
+    counter.rect(0, 14, 95, 49, 'w'); counter.rect(0, 12, 95, 15, 'j'); counter.hline(0, 95, 12, 'D')
+    for x in range(4, 92, 22):
+        counter.rect(x, 20, x + 16, 44, 'J'); counter.rect(x + 2, 22, x + 14, 42, 'j')
+    for cx in (12, 44, 76):
+        P.prop_cup(counter, cx, 1, steam=(cx == 44), small=True)
+    counter.outline('K'); add('deco_counter', counter)
+    shelf = G(48, 48)
+    for yb in (14, 30, 46):
+        shelf.rect(0, yb, 47, yb + 1, 'w'); shelf.hline(0, 47, yb, 'D')
+    for yb in (14, 30):
+        for cx in (4, 20, 36):
+            P.prop_cup(shelf, cx, yb - 12, steam=False, small=True)
+    shelf.outline('K'); add('deco_shelf', shelf)
+    falls = []
+    for fr in range(2):
+        wf = G(32, 96)
+        for x in range(1, 31, 3):
+            wf.vline(x, 0, 89, 'J' if (x // 3 + fr) % 2 == 0 else 'j')
+            for y in range((x * 7 + fr * 6) % 12, 88, 12):
+                wf.set(x, y, 'w')
+        wf.ellipse(16, 92, 15, 3.5, 'I'); wf.ellipse(16, 91, 12, 2, 'Y'); wf.outline('K')
+        falls.append(wf)
+    add('deco_waterfall', falls)
+    belt = G(32, 12)
+    belt.rect(0, 0, 31, 11, 'X')
+    for x in range(0, 32, 8):
+        for k in range(4):
+            belt.set((x + k) % 32, 2 + k, 'o'); belt.set((x + k) % 32, 9 - k, 'o')
+    belt.hline(0, 31, 0, 'K'); belt.hline(0, 31, 11, 'K'); add('belt', belt)
+    cup = G(64, 20)
+    cup.rect(6, 0, 57, 3, 'J'); cup.rect(6, 4, 57, 19, 'O'); cup.rect(8, 6, 55, 17, 'W'); cup.rect(8, 11, 55, 13, 'P')
+    cup.rect(57, 6, 63, 15, 'O'); cup.rect(59, 8, 61, 13, '.'); cup.hline(6, 57, 3, 'j'); cup.outline('K'); add('plat_cup', cup)
+    wheel = G(96, 96)
+    wheel.ellipse(48, 48, 47, 47, 'g'); wheel.ellipse(48, 48, 44, 44, 'K'); wheel.ellipse(48, 48, 42, 42, 'R')
+    wheel.fill_where(lambda x, y, c: c == 'R' and int((_m.atan2(y - 48, x - 48) + _m.pi) / (2 * _m.pi) * 12) % 2 == 1, 'X')
+    wheel.ellipse(48, 48, 14, 14, 'K'); wheel.ellipse(48, 48, 13, 13, 'G'); wheel.ellipse(48, 48, 10, 10, 'L'); _dt(wheel, 46, 45, 'C', 'K'); add('deco_roulette', wheel)
+    jd = G(48, 64)
+    jd.rect(0, 0, 47, 63, 'n'); jd.rect(4, 4, 43, 63, 'B'); jd.rect(6, 6, 41, 61, 'p')
+    jd.ellipse(24, 26, 10, 12, 'W'); jd.set(20, 23, 'K'); jd.set(28, 23, 'K'); jd.hline(20, 28, 31, 'K'); jd.set(19, 30, 'K'); jd.set(29, 30, 'K')
+    jd.rect(14, 10, 33, 13, 'P'); jd.set(14, 8, 'P'); jd.set(33, 8, 'P'); jd.set(12, 6, 'A'); jd.set(35, 6, 'A'); jd.rect(18, 6, 29, 9, 'A')
+    _dt(jd, 13, 50, 'JOKER', 'L'); jd.outline('K'); add('deco_joker_door', jd)
+    sugar = G(32, 10)
+    sugar.ellipse(16, 7, 15, 3.5, 'W'); sugar.rect(6, 3, 9, 6, 'O'); sugar.rect(14, 1, 18, 5, 'W'); sugar.rect(22, 3, 25, 6, 'O')
+    sugar.set(11, 2, 'Q'); sugar.set(20, 0, 'Q'); sugar.set(27, 4, 'Q'); sugar.ellipse(16, 9, 15, 1.5, 'o'); sugar.outline('K'); add('haz_sugar', sugar)
+    for key, lines in (('good_people', ['GOOD PEOPLE']), ('crazy_times', ['CRAZY TIMES']), ('good_coffee', ['GOOD COFFEE']),
+                       ('better_people', ['BETTER PEOPLE']), ('same_friends', ['SAME FRIENDS']), ('different_rules', ['DIFFERENT RULES'])):
+        add('chalk_' + key, E.chalkboard(lines))
+    arrow = G(16, 22)
+    arrow.rect(7, 0, 8, 13, 'P'); arrow.line(1, 8, 7, 15, 'P'); arrow.line(14, 8, 8, 15, 'P'); arrow.rect(6, 14, 9, 16, 'P'); arrow.outline('K'); add('deco_arrow', arrow)
+    carpet = G(128, 6)
+    carpet.rect(0, 0, 127, 5, 'R'); carpet.hline(0, 127, 0, 'G'); carpet.hline(0, 127, 5, 'G'); _dt(carpet, 62, 1, 'B', 'G'); add('deco_carpet', carpet)
+    add('sign_coffee', E.sign(['BARIOS COFFEE >'])); add('sign_cambio', E.sign(['CAMBIO >'])); add('sign_thron', E.sign(['DER THRONSAAL >']))
+
     if include_scenes:
         add('scene_barios', E.scene_barios()); add('scene_vfb', E.scene_vfb()); add('scene_arena', E.scene_arena())
         add('tile', E.platform(2))

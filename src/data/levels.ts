@@ -1,14 +1,11 @@
-export interface LevelDef { key: string; file: string; name: string; world: number; }
+export interface LevelDef { key: string; file: string; name: string; world: number; motto?: string; station?: string; }
 
-const L = (world: number, n: number, title: string): LevelDef =>
-  ({ key: `lvl_w${world}_${n}`, file: `levels/w${world}-${n}.tmj`, name: `${world}-${n}  ${title}`, world });
-
+/** Season 1: three handcrafted stations, then the Thronsaal. Test levels only show up with ?debug. */
 export const LEVELS: LevelDef[] = [
-  L(1, 1, 'DER BOULEVARD'), L(1, 2, 'KLEINE SCHRITTE'), L(1, 3, 'GUTE LAUNE'), L(1, 4, 'SAME SHIT'), L(1, 5, 'DIFFERENT LEVEL'),
-  L(2, 1, 'GOOD COFFEE'), L(2, 2, 'BETTER PEOPLE'), L(2, 3, 'TROMMLER'), L(2, 4, 'AUFWIND'), L(2, 5, 'ESPRESSO'),
-  L(3, 1, 'SAME FRIENDS'), L(3, 2, 'FAN-BLOCK'), L(3, 3, 'DIFFERENT RULES'), L(3, 4, 'JOKER'), L(3, 5, 'ALL IN'),
-  L(4, 1, 'VFB AREA'), L(4, 2, 'MEITHHTER'), L(4, 3, 'TROMMELWIRBEL'), L(4, 4, 'FAN-BLOCK II'), L(4, 5, 'FINALE'),
-  { key: 'lvl_boss', file: 'levels/boss.tmj', name: 'FINAL BOSS  DER THRONSAAL', world: 5 },
+  { key: 'lvl_s1_1', file: 'levels/s1-1.tmj', name: '1  DER BOULEVARD', world: 1, motto: 'Good People, Crazy Times', station: 'BOULEVARD' },
+  { key: 'lvl_s1_2', file: 'levels/s1-2.tmj', name: '2  BARIOS COFFEE', world: 2, motto: 'Good Coffee, Better People', station: 'COFFEE' },
+  { key: 'lvl_s1_3', file: 'levels/s1-3.tmj', name: '3  CAMBIO', world: 3, motto: 'Same Friends, Different Rules', station: 'CAMBIO' },
+  { key: 'lvl_boss', file: 'levels/boss.tmj', name: 'FINAL BOSS  DER THRONSAAL', world: 5, motto: 'Ruhe im Spiel, Chaos im Kopf', station: 'THRONSAAL' },
   { key: 'lvl_t1', file: 'levels/t1.tmj', name: 'TEST  SPRUNGPARK', world: 0 },
   { key: 'lvl_t2', file: 'levels/t2.tmj', name: 'TEST  FORMENPARK', world: 0 },
 ];

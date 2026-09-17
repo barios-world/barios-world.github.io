@@ -1,0 +1,212 @@
+[
+{
+"type": "deco",
+"x": 4,
+"y": 9,
+"props": {
+"frame": "deco_carpet_0"
+}
+},
+{
+"type": "deco",
+"x": 8,
+"y": 4,
+"props": {
+"frame": "deco_neon_0"
+}
+},
+{
+"type": "deco",
+"x": 16,
+"y": 9,
+"props": {
+"frame": "chalk_same_friends_0"
+}
+},
+{
+"type": "talk",
+"x": 3,
+"y": 4,
+"w": 2,
+"h": 6,
+"props": {
+"text": "\u00a1SAME FRIENDS,\nDIFFERENT RULES!",
+"voice": "querico",
+"ms": 1700
+}
+},
+{
+"type": "talk",
+"x": 29,
+"y": 4,
+"w": 2,
+"h": 6,
+"props": {
+"text": "KARTE BLINKT = GLEICH WEG!",
+"voice": "si",
+"ms": 1500
+}
+},
+{
+"type": "section",
+"x": 37,
+"y": 0,
+"w": 2,
+"h": 14,
+"props": {
+"track": "casino"
+}
+},
+{
+"type": "deco",
+"x": 70,
+"y": 9,
+"props": {
+"frame": "chalk_different_rules_0"
+}
+},
+{
+"type": "deco",
+"x": 74,
+"y": 4,
+"props": {
+"frame": "deco_neon_0"
+}
+},
+{
+"type": "orbit",
+"x": 84,
+"y": 7,
+"props": {
+"n": 4,
+"radius": 96,
+"speed": 45,
+"hub": true
+}
+},
+{
+"type": "talk",
+"x": 92,
+"y": 4,
+"w": 2,
+"h": 6,
+"props": {
+"text": "DER JOKER \u00d6FFNET T\u00dcREN\u2026",
+"voice": "si",
+"ms": 1400
+}
+},
+{
+"type": "warp",
+"x": 96,
+"y": 9,
+"props": {
+"id": "j1",
+"target": "j2",
+"kind": "door",
+"frame": "deco_joker_door_0"
+}
+},
+{
+"type": "deco",
+"x": 100,
+"y": 4,
+"props": {
+"frame": "deco_neon_0"
+}
+},
+{
+"type": "section",
+"x": 132,
+"y": 0,
+"w": 2,
+"h": 14,
+"props": {
+"track": "casino_finale"
+}
+},
+{
+"type": "storm",
+"x": 133,
+"y": 6,
+"w": 2,
+"h": 4,
+"props": {
+"count": 9,
+"every": 1300,
+"variants": "basic,basic,fanblock,basic,trommler,basic,fanblock,basic,basic",
+"text": "DER FANBLOCK KOMMT!"
+}
+},
+{
+"type": "deco",
+"x": 160,
+"y": 9,
+"props": {
+"frame": "banner_0"
+}
+},
+{
+"type": "deco",
+"x": 170,
+"y": 9,
+"props": {
+"frame": "banner_0"
+}
+},
+{
+"type": "deco",
+"x": 182,
+"y": 9,
+"props": {
+"frame": "deco_banner_red_0"
+}
+},
+{
+"type": "deco",
+"x": 180,
+"y": 9,
+"props": {
+"frame": "deco_chalk_inf_0"
+}
+},
+{
+"type": "deco",
+"x": 184,
+"y": 9,
+"props": {
+"frame": "sign_thron_0"
+}
+},
+{
+"type": "talk",
+"x": 176,
+"y": 4,
+"w": 2,
+"h": 6,
+"props": {
+"text": "\u00a1GRACIAS, CAMBIO!",
+"voice": "gracias",
+"ms": 1400
+}
+},
+{
+"type": "warp",
+"x": 189,
+"y": 9,
+"props": {
+"id": "j2",
+"target": "j1",
+"kind": "door",
+"frame": "deco_joker_door_0"
+}
+},
+{
+"type": "deco",
+"x": 199,
+"y": 4,
+"props": {
+"frame": "deco_neon_0"
+}
+}
+]
