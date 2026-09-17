@@ -90,3 +90,71 @@ export class Pacifier extends Phaser.Physics.Arcade.Sprite {
   }
   expired(now: number) { return now - this.born > 2500; }
 }
+
+/** The Direktor's sunglasses: fly out, turn around, come back (two dodge windows). */
+export class Glasses extends Phaser.Physics.Arcade.Sprite {
+  declare body: Phaser.Physics.Arcade.Body;
+  born: number;
+  dir: number;
+  constructor(scene: Phaser.Scene, x: number, y: number, dir: number) {
+    super(scene, x, y, 'spr', 'it_brille_0');
+    scene.add.existing(this);
+    scene.physics.add.existing(this);
+    this.dir = dir;
+    this.setDepth(9);
+    this.body.setAllowGravity(false);
+    this.body.setSize(18, 10).setOffset(3, 7);
+    this.body.setVelocityX(dir * 340);
+    this.body.setAngularVelocity(dir * 540);
+    this.born = scene.time.now;
+    scene.tweens.add({ targets: this, alpha: 0.7, duration: 200, yoyo: true, repeat: -1 });
+  }
+  tick(now: number) {
+    const t = now - this.born;
+    if (t > 520) {
+      const p = Phaser.Math.Clamp((t - 520) / 420, 0, 1);
+      this.body.setVelocityX(this.dir * 340 * (1 - 2 * p));
+    }
+  }
+  expired(now: number) { return now - this.born > 1500; }
+}
+
+/** Sugar crystal erupting from the floor: hurts while risen, sinks back. */
+export class Crystal extends Phaser.Physics.Arcade.Image {
+  declare body: Phaser.Physics.Arcade.StaticBody;
+  armed = false;
+  constructor(scene: Phaser.Scene, x: number, groundY: number) {
+    super(scene, x, groundY + 38, 'spr', 'it_kristall_0');
+    scene.add.existing(this);
+    scene.physics.add.existing(this, true);
+    this.setOrigin(0.5, 1).setScale(1.6).setDepth(6);
+    this.body.setSize(20, 34).setOffset(10, 4);
+    this.body.enable = false;
+    scene.tweens.add({ targets: this, y: groundY + 2, duration: 220, ease: 'Back.out', onComplete: () => {
+      if (!this.active) return;
+      this.armed = true; this.body.enable = true; this.body.updateFromGameObject();
+      scene.time.delayedCall(520, () => {
+        if (!this.active) return;
+        this.armed = false; this.body.enable = false;
+        scene.tweens.add({ targets: this, y: groundY + 40, alpha: 0, duration: 300, onComplete: () => this.destroy() });
+      });
+    } });
+  }
+}
+
+/** Kaffee Regen cup: falls from the sky, leaves a short-lived puddle. */
+export class RainCup extends Phaser.Physics.Arcade.Sprite {
+  declare body: Phaser.Physics.Arcade.Body;
+  born: number;
+  constructor(scene: Phaser.Scene, x: number, y: number) {
+    super(scene, x, y, 'spr', 'it_kaffee_0');
+    scene.add.existing(this);
+    scene.physics.add.existing(this);
+    this.setDepth(9).setScale(0.85);
+    this.body.setSize(16, 16).setOffset(4, 4);
+    this.body.setGravityY(720);
+    this.body.setVelocityY(60);
+    this.born = scene.time.now;
+  }
+  expired(now: number) { return now - this.born > 4000; }
+}

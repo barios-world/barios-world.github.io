@@ -57,7 +57,18 @@ export const TRACK_VFB: Track = {
   melVoice: 'square',
 };
 
-export const TRACKS = { boulevard: TRACK_BOULEVARD, coffee: TRACK_COFFEE, casino: TRACK_CASINO, vfb: TRACK_VFB, title: TRACK_TITLE };
+/** Final boss – Der Direktor: driving minor riff, 140 bpm. */
+export const TRACK_BOSS: Track = {
+  bpm: 140,
+  melody: [57, 0, 57, 60, 0, 57, 55, 0, 57, 0, 57, 60, 0, 62, 60, 0, 57, 0, 57, 60, 0, 57, 55, 0, 53, 0, 55, 0, 57, 0, 0, 0,
+           64, 0, 64, 67, 0, 64, 62, 0, 64, 0, 64, 67, 0, 69, 67, 0, 64, 0, 62, 60, 0, 62, 60, 0, 57, 0, 55, 0, 57, 0, 0, 0],
+  bass:   [45, 45, 0, 45, 45, 0, 43, 0, 45, 45, 0, 45, 48, 0, 47, 0, 45, 45, 0, 45, 45, 0, 43, 0, 41, 0, 43, 0, 45, 0, 45, 0,
+           52, 52, 0, 52, 52, 0, 50, 0, 52, 52, 0, 52, 55, 0, 53, 0, 52, 52, 0, 50, 48, 0, 50, 0, 45, 0, 43, 0, 45, 0, 45, 0],
+  drums: 'k.H.s.H.k.H.s.HHk.H.s.H.k.HksHHHk.H.s.H.k.H.s.HHk.H.s.H.kHsHsHHH',
+  melVoice: 'sawtooth',
+};
+
+export const TRACKS = { boulevard: TRACK_BOULEVARD, coffee: TRACK_COFFEE, casino: TRACK_CASINO, vfb: TRACK_VFB, title: TRACK_TITLE, boss: TRACK_BOSS };
 
 class Synth {
   private ctx?: AudioContext;
@@ -193,6 +204,12 @@ class Synth {
   djwave(perfect: boolean) { this.sfx(() => this.tone('sine', perfect ? 660 : 440, perfect ? 1320 : 660, 0.18, 0.4)); }
   khusra() { this.sfx(() => { this.tone('sawtooth', 120, 480, 0.6, 0.5); this.tone('square', 240, 960, 0.5, 0.3, 0.05); this.noise(0.5, 0.35, 400); }); }
   special() { this.sfx(() => [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => this.tone('triangle', f, f, 0.12, 0.35, i * 0.05))); }
+  bossHit() { this.sfx(() => { this.tone('square', 180, 90, 0.16, 0.5); this.noise(0.1, 0.3, 500); }); }
+  glasses() { this.sfx(() => this.tone('triangle', 900, 1400, 0.12, 0.3)); }
+  crystal() { this.sfx(() => { this.tone('square', 700, 1800, 0.14, 0.3); this.noise(0.08, 0.25, 3000); }); }
+  teleport() { this.sfx(() => this.tone('sine', 300, 1200, 0.25, 0.3)); }
+  phase() { this.sfx(() => { [220, 277, 330, 440].forEach((f, i) => this.tone('sawtooth', f, f * 1.02, 0.35, 0.35, i * 0.12)); this.noise(0.4, 0.3, 600); }); }
+  victory() { this.sfx(() => [523, 659, 784, 1047, 784, 1047, 1319, 1568].forEach((f, i) => this.tone('square', f, f, 0.18, 0.35, i * 0.13))); }
   meterFull() { this.sfx(() => [880, 1109, 1319].forEach((f, i) => this.tone('square', f, f, 0.1, 0.3, i * 0.07))); }
 
   private schedule() {

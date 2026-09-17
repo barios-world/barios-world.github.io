@@ -9,7 +9,7 @@ export interface WorldTheme {
   hillNearTint: number;
   cloudAlpha: number;
   tiles: string;
-  track: 'boulevard' | 'coffee' | 'casino' | 'vfb';
+  track: 'boulevard' | 'coffee' | 'casino' | 'vfb' | 'boss';
   /** decor frames placed on the ground every ~n px behind everything */
   ambient: { frame: string; every: number; scroll: number; yOff: number; alpha: number; scale?: number }[];
 }
@@ -23,6 +23,8 @@ export const WORLDS: Record<number, WorldTheme> = {
        ambient: [{ frame: 'deco_neon_0', every: 480, scroll: 0.5, yOff: -70, alpha: 1 }, { frame: 'deco_table_0', every: 330, scroll: 0.6, yOff: 0, alpha: 0.9 }] },
   4: { id: 4, name: 'VFB AREA', sky: '#9FD8F0', horizon: '#CFEFFA', hillFarTint: 0xdedede, hillFarAlpha: 0.9, hillNearTint: 0x63b84e, cloudAlpha: 1, tiles: 'tiles_w4', track: 'vfb',
        ambient: [{ frame: 'deco_stand_0', every: 200, scroll: 0.35, yOff: -30, alpha: 0.85 }, { frame: 'deco_floodlight_0', every: 640, scroll: 0.5, yOff: 0, alpha: 1 }, { frame: 'banner_0', every: 420, scroll: 0.55, yOff: -40, alpha: 1 }] },
+  5: { id: 5, name: 'DER THRONSAAL', sky: '#2A1218', horizon: '#4A1F2C', hillFarTint: 0x3a1520, hillFarAlpha: 0.9, hillNearTint: 0x2a0e17, cloudAlpha: 0, tiles: 'tiles_w5', track: 'boss',
+       ambient: [{ frame: 'deco_pillar_0', every: 230, scroll: 0.7, yOff: 0, alpha: 1 }, { frame: 'deco_banner_red_0', every: 460, scroll: 0.75, yOff: -110, alpha: 1 }, { frame: 'deco_window_0', every: 700, scroll: 0.8, yOff: -90, alpha: 1 }] },
 };
 
 export const worldOf = (id: number) => WORLDS[id] ?? WORLDS[1];

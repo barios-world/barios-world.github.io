@@ -73,6 +73,7 @@ VARIANTS = {
     'w2': ({'A': 'I', 'F': 'Y', 'a': 'i', '7': 'J', '8': '#', '9': 'j'}, None),                       # latte: foam over coffee
     'w3': ({'A': 'a', 'F': 'A', 'a': '#', '7': '@', '8': '#', '9': '$'}, lambda g: g.hline(0, T - 1, 7, 'G') if g.get(3, 3) in ('a', 'A') else None),  # felt + gold trim over dark wood
     'w4': ({'7': '9', '8': '7', '9': 'w', 'F': 'O'}, None),                                             # pitch: white line, light soil
+    'w5': ({'A': 'R', 'F': 'V', 'a': 'r', '7': '@', '8': '#', '9': '$'}, lambda g: g.hline(0, T - 1, 7, 'G') if g.get(3, 3) in ('R', 'V') else None),  # throne room: red carpet, gold trim, dark stone
 }
 for name, (remap, post) in VARIANTS.items():
     sheet = Image.new('RGBA', (COLS * T, rows * T), (0, 0, 0, 0))

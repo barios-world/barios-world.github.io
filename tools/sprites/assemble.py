@@ -148,6 +148,12 @@ def assemble(include_scenes=True):
         pm.set(x, 6, '#'); pm.set(x + 1, 6, '#')
     pm.outline('K'); add('plat_move', pm)
     ball = scale_up(I.ball(), 1); add('haz_ball', ball)
+    add('deco_pillar', E.pillar(96)); add('deco_torch', scale_up(E.torch(), 2)); add('deco_throne', scale_up(E.throne(), 2))
+    add('deco_banner_red', E.red_banner(['BARIOS', 'WORLD'])); add('deco_window', E.moon_window()); add('deco_chalk_inf', E.chalkboard(['BARIOS WORLD', 'LEVEL ~']))
+    machine = G(28, 40); machine.rect(2, 4, 25, 37, '0'); machine.rect(4, 6, 23, 14, '#'); machine.rect(6, 8, 21, 12, '=')
+    machine.rect(8, 20, 19, 26, 'J'); machine.rect(10, 22, 17, 24, 'j'); machine.rect(4, 30, 23, 35, '-'); machine.set(24, 18, 'R'); machine.rect(11, 15, 16, 18, '$')
+    machine.outline('K'); P.prop_cup(machine, 9, 29, steam=False, small=True); add('deco_machine', machine)
+    belt = G(30, 14); belt.rect(0, 3, 29, 10, '#'); belt.rect(9, 1, 20, 12, 'G'); belt.rect(11, 3, 18, 10, 'L'); belt.set(14, 6, 'R'); belt.set(15, 6, 'R'); belt.outline('K'); add('it_guertel', belt)
     drum = G(20, 16); drum.rect(2, 4, 17, 15, 'R'); drum.rect(2, 4, 17, 6, 'O'); drum.rect(2, 13, 17, 15, 'r'); drum.vline(6, 6, 13, 'O'); drum.vline(13, 6, 13, 'O'); drum.outline('K'); add('prop_drum', drum)
 
     if include_scenes:

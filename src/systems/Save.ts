@@ -10,6 +10,7 @@ export interface SaveData {
   settings: Settings;
   totalCards: number;
   upgrades: Upgrades;
+  bossCleared: boolean;
 }
 
 const KEY = 'barios-world-save-v1';
@@ -21,6 +22,7 @@ const fresh = (): SaveData => ({
   settings: { sound: true, music: true, leftHand: false, buttonScale: 1, assist: false },
   totalCards: 0,
   upgrades: { ...NO_UPGRADES },
+  bossCleared: false,
 });
 
 class SaveStore {

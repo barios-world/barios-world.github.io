@@ -17,6 +17,7 @@ export class HudScene extends Phaser.Scene {
   private specialIcon!: Phaser.GameObjects.Image;
   private specialBar!: Phaser.GameObjects.Graphics;
   private meterLbl!: Phaser.GameObjects.Text;
+  private bossLbl!: Phaser.GameObjects.Text;
   private cardIcon!: Phaser.GameObjects.Image;
   private cardTxt!: Phaser.GameObjects.Text;
   private comboTxt!: Phaser.GameObjects.Text;
@@ -52,6 +53,7 @@ export class HudScene extends Phaser.Scene {
     this.specialIcon = this.add.image(0, 0, 'spr', 'pk_kaffeepower_0').setOrigin(0, 0).setScale(u).setVisible(false);
     this.specialBar = this.add.graphics();
     this.meterLbl = this.add.text(0, 0, 'KHUSRA', { ...font, fontSize: `${5 * u}px`, color: '#FF4FA3' }).setOrigin(0, 1);
+    this.bossLbl = this.add.text(0, 0, 'DER DIREKTOR', { ...font, fontSize: `${6 * u}px`, color: '#FFF4DC' }).setOrigin(0.5, 0).setVisible(false);
     this.cardIcon = this.add.image(0, 0, 'spr', 'it_karte_0').setOrigin(1, 0).setScale(u);
     this.cardTxt = this.add.text(0, 0, 'x 0', font).setOrigin(1, 0);
     this.comboTxt = this.add.text(0, 0, '', { ...font, fontSize: `${7 * u}px`, color: '#FF4FA3' }).setOrigin(1, 0);
@@ -180,6 +182,15 @@ export class HudScene extends Phaser.Scene {
     const full = kh >= 100;
     g.fillStyle(full ? (Math.floor(this.time.now / 160) % 2 ? 0xffe7f2 : 0xff4fa3) : 0xff4fa3, 1).fillRoundedRect(L, top, Math.max(4 * u, mw * kh / 100), 7 * u, 3 * u);
     const gs = this.gameScene;
+    const bossHp = this.registry.get('bossHp') as number | undefined;
+    if (typeof bossHp === 'number' && bossHp >= 0) {
+      const bw = 170 * u, bx = this.scale.width / 2 - bw / 2, by = inp.pauseRect.bottom + 10 * u;
+      this.bossLbl.setVisible(true).setPosition(this.scale.width / 2, by - 9 * u);
+      g.fillStyle(0x14100e, 0.7).fillRoundedRect(bx - 2 * u, by - 2 * u, bw + 4 * u, 12 * u, 3 * u);
+      g.lineStyle(2 * u, 0xff4fa3, 1).strokeRoundedRect(bx - 2 * u, by - 2 * u, bw + 4 * u, 12 * u, 3 * u);
+      g.fillStyle(0xe8434f, 1).fillRect(bx, by, bw * bossHp / 100, 8 * u);
+      g.fillStyle(0x14100e, 1).fillRect(bx + bw * 0.66 - u, by, 2 * u, 8 * u).fillRect(bx + bw * 0.33 - u, by, 2 * u, 8 * u);
+    } else this.bossLbl.setVisible(false);
     if (gs.special) {
       const left = Math.max(0, (gs.specialUntil - this.time.now) / (SPECIALS[gs.special].ms));
       const sx = this.specialIcon.x + 26 * u, sy = this.specialIcon.y + 8 * u;

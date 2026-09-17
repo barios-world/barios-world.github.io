@@ -66,6 +66,13 @@ export const T = {
   DRUM_BUFF: 1.5,
   FAHNE_BUFF: 1.4,
   FAHNE_RADIUS: 170,
+  // boss
+  BOSS_STOMP_DMG: 12,
+  BOSS_PROJ_DMG: 6,
+  BOSS_PUNCH_DMG: 8,
+  BOSS_CHORD_DMG: 10,
+  BOSS_ULT_DMG: 25,
+  BOSS_TORCH_STUN: 2000,
 };
 
 export type TuningKey = keyof typeof T;

@@ -385,6 +385,25 @@ def w4_5():
     L.finish()
 
 
+# ================================================================ BOSS – DER THRONSAAL
+def boss():
+    L = Lvl('boss', 'DER THRONSAAL', 5)
+    L.g(46)
+    # throne podium in the middle: two steps up to the throne
+    L.raise_(-27, 8, 8).raise_(-25, 4, 7)
+    L.o(-23, 6, 'h')                        # throne on top
+    L.o(-41, 9, 'y').o(-33, 9, 'y').o(-13, 9, 'y').o(-5, 9, 'y')
+    L.o(-40, 4, 'r').o(-6, 4, 'r')
+    L.o(-37, 5, 'f').o(-9, 5, 'f').o(-31, 5, 'f').o(-15, 5, 'f')
+    L.o(-45, 9, 'e')                        # coffee machine, left wall
+    L.o(-19, 9, 'Q').o(-3, 9, 'u')
+    L.o(-23, 5, 'X')                        # the Direktor sits on his throne
+    L.c(-36, 7, 3).c(-12, 7, 3)
+    L.rows[9][2] = '.'; L.rows[9][4] = 'S'   # spawn a bit right of the machine
+    L.finish(flag_dx=-4)                    # the flag is hidden until the Direktor is beaten
+
+
 if __name__ == '__main__':
+    boss()
     for fn in (w1_2, w1_3, w1_4, w1_5, w2_1, w2_2, w2_3, w2_4, w2_5, w3_1, w3_2, w3_3, w3_4, w3_5, w4_1, w4_2, w4_3, w4_4, w4_5):
         fn()

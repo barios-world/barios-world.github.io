@@ -65,6 +65,14 @@ for (const f of files) {
         case 'v': obj('mob', cx, (y + 1) * TS, { properties: [{ name: 'variant', type: 'string', value: 'fahne' }] }); break;
         case 'z': obj('mob', cx, (y + 1) * TS, { properties: [{ name: 'variant', type: 'string', value: 'trommler' }] }); break;
         case 'M': obj('mob', cx, (y + 1) * TS, { properties: [{ name: 'variant', type: 'string', value: 'fanblock' }] }); break;
+        case 'X': obj('boss', cx, (y + 1) * TS); break;
+        case 'f': obj('torch', cx, cy); break;
+        case 'e': obj('machine', cx, (y + 1) * TS); break;
+        case 'y': obj('deco', cx, (y + 1) * TS, { properties: [{ name: 'frame', type: 'string', value: 'deco_pillar_0' }] }); break;
+        case 'h': obj('deco', cx, (y + 1) * TS, { properties: [{ name: 'frame', type: 'string', value: 'deco_throne_0' }] }); break;
+        case 'r': obj('deco', cx, (y + 1) * TS, { properties: [{ name: 'frame', type: 'string', value: 'deco_banner_red_0' }] }); break;
+        case 'u': obj('deco', cx, (y + 1) * TS, { properties: [{ name: 'frame', type: 'string', value: 'deco_window_0' }] }); break;
+        case 'Q': obj('deco', cx, (y + 1) * TS, { properties: [{ name: 'frame', type: 'string', value: 'deco_chalk_inf_0' }] }); break;
         case 'x': obj('puddle', cx, (y + 1) * TS); break;
         case '^': obj('vent', cx, (y + 1) * TS); break;
         case 'o': obj('ballspawner', cx, cy); break;

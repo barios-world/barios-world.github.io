@@ -6,7 +6,8 @@ import { save } from '../systems/Save';
 import { Player } from '../entities/Player';
 import { Mob, type Variant } from '../entities/Mob';
 import { Block } from '../entities/Block';
-import { Cup, Wave, HomingCard, Pacifier } from '../entities/Projectiles';
+import { Cup, Wave, HomingCard, Pacifier, Glasses, Crystal, RainCup } from '../entities/Projectiles';
+import { Direktor } from '../entities/Direktor';
 import { Puddle, Vent, Ball, BallSpawner, CardPlatform, MovingPlatform } from '../entities/Hazards';
 import { LEVELS, nextLevel } from '../data/levels';
 import { worldOf } from '../data/worlds';
@@ -39,6 +40,14 @@ export class GameScene extends Phaser.Scene {
   pickups!: Phaser.Physics.Arcade.Group;
   spawners: BallSpawner[] = [];
   flag?: Phaser.Physics.Arcade.Image;
+  boss?: Direktor;
+  glasses!: Phaser.Physics.Arcade.Group;
+  crystals!: Phaser.Physics.Arcade.StaticGroup;
+  rain!: Phaser.Physics.Arcade.Group;
+  torches!: Phaser.Physics.Arcade.StaticGroup;
+  machine?: Phaser.Physics.Arcade.Image;
+  machinePhase = 0;
+  bossDone = false;
   dust!: Phaser.GameObjects.Particles.ParticleEmitter;
   sparks!: Phaser.GameObjects.Particles.ParticleEmitter;
   paint!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -87,6 +96,11 @@ export class GameScene extends Phaser.Scene {
     this.mobs = [];
     this.spawners = [];
     this.totalCards = 0;
+    this.boss = undefined;
+    this.machine = undefined;
+    this.machinePhase = 0;
+    this.bossDone = false;
+    this.registry.set('bossHp', -1);
     this.inputSys = new InputSystem(this);
     const level = LEVELS.find((l) => l.key === this.levelKey) ?? LEVELS[0];
     const theme = worldOf(level.world);
@@ -126,6 +140,10 @@ export class GameScene extends Phaser.Scene {
     this.balls = this.dynGroup();
     this.pacifiers = this.dynGroup();
     this.movers = this.dynGroup();
+    this.glasses = this.dynGroup();
+    this.rain = this.dynGroup();
+    this.crystals = this.physics.add.staticGroup();
+    this.torches = this.physics.add.staticGroup();
     this.pickups = this.physics.add.group();
 
     // --- objects
@@ -174,6 +192,18 @@ export class GameScene extends Phaser.Scene {
           break;
         }
         case 'mob': mobDefs.push([x, y, ((prop(o, 'variant') as Variant) ?? 'basic')]); break;
+        case 'boss': this.boss = new Direktor(this, x, y); break;
+        case 'torch': {
+          const t = this.torches.create(x, y, 'spr', 'deco_torch_0') as Phaser.Physics.Arcade.Sprite;
+          t.setOrigin(0.5, 0.5).setDepth(1).setData('home', y);
+          (t.body as Phaser.Physics.Arcade.StaticBody).setSize(22, 34).setOffset(-1, 0);
+          break;
+        }
+        case 'machine': {
+          this.machine = this.physics.add.staticImage(x, y, 'spr', 'deco_machine_0').setOrigin(0.5, 1).setDepth(1);
+          (this.machine.body as Phaser.Physics.Arcade.StaticBody).setSize(30, 44).setOffset(-1, -4);
+          break;
+        }
         case 'puddle': this.puddles.add(new Puddle(this, x, y)); break;
         case 'vent': this.vents.add(new Vent(this, x, y)); break;
         case 'ballspawner': this.spawners.push(new BallSpawner(x, y, T.BALL_EVERY)); this.add.image(x, y, 'spr', 'haz_ball_0').setAlpha(0.35).setDepth(-1); break;
@@ -222,6 +252,36 @@ export class GameScene extends Phaser.Scene {
       m.onDrum = () => this.drumBeat();
       this.mobs.push(m);
       this.mobGroup.add(m);
+    }
+
+    // --- boss wiring
+    if (this.boss) {
+      const b = this.boss;
+      this.physics.add.collider(b, this.ground);
+      this.physics.add.collider(b, this.solids);
+      b.onGlasses = (x, y, dir) => this.glasses.add(new Glasses(this, x, y, dir));
+      b.onKick = (x, y, dir) => this.bossKick(x, y, dir);
+      b.onRain = (wave) => this.bossRain(wave);
+      b.onCrystal = (x, y) => { audio.crystal(); this.crystals.add(new Crystal(this, x, y)); this.dust.emitParticleAt(x, y, 5); };
+      b.onPhase = (p) => this.bossPhase(p);
+      b.onTeleport = (x) => { this.sparks.emitParticleAt(b.x, b.y - 30, 8); this.sparks.emitParticleAt(x, b.y - 30, 8); };
+      b.onDead = () => this.victory();
+      this.registry.set('bossHp', 100);
+      if (this.flag) { this.flag.setVisible(false); (this.flag.body as Phaser.Physics.Arcade.StaticBody).enable = false; }
+      this.physics.add.overlap(this.player, b, () => this.playerVsBoss());
+      this.physics.add.overlap(this.cups, b, (c) => this.projectileVsBoss(c as Phaser.Physics.Arcade.Sprite));
+      this.physics.add.overlap(this.homing, b, (c) => this.projectileVsBoss(c as Phaser.Physics.Arcade.Sprite));
+      this.physics.add.overlap(this.waves, b, (w) => { const wv = w as Wave; if (wv.owner === 'player' && !wv.hit.has(b)) { wv.hit.add(b); b.hit(3); } });
+      this.physics.add.overlap(this.player, this.glasses, (_p, gl) => { if (this.damagePlayer((gl as Glasses).dir)) (gl as Glasses).destroy(); });
+      this.physics.add.overlap(this.player, this.crystals, (_p, c) => { if ((c as Crystal).armed) this.damagePlayer(Math.sign(this.player.x - (c as Crystal).x) || 1); });
+      this.physics.add.overlap(this.player, this.rain, (_p, r) => { if (this.damagePlayer(-this.player.facing || 1)) this.breakSmall(r as Phaser.Physics.Arcade.Sprite); });
+      this.physics.add.collider(this.rain, this.ground, (r) => this.rainSplash(r as RainCup));
+      this.physics.add.collider(this.rain, this.solids, (r) => this.rainSplash(r as RainCup));
+      this.physics.add.overlap(this.cups, this.torches, (c, t) => this.torchHit(c as Phaser.Physics.Arcade.Sprite, t as Phaser.Physics.Arcade.Sprite));
+      this.physics.add.overlap(this.homing, this.torches, (c, t) => this.torchHit(c as Phaser.Physics.Arcade.Sprite, t as Phaser.Physics.Arcade.Sprite));
+      if (this.machine) this.physics.add.overlap(this.player, this.machine, () => this.useMachine());
+      this.time.delayedCall(300, () => this.events.emit('msg', 'DER DIREKTOR\n\nRUHE IM SPIEL, CHAOS IM KOPF.', 2200));
+      this.cameras.main.flash(400, 40, 10, 20);
     }
 
     // --- collisions
@@ -362,6 +422,10 @@ export class GameScene extends Phaser.Scene {
       this.events.emit('msg', FORMS[kind].msg, 1600);
     } else if (isSpecial(kind)) {
       this.startSpecial(kind);
+    } else if (kind === 'guertel') {
+      audio.special();
+      this.events.emit('msg', 'DER GUERTEL!  ER VERLIERT IHN NIE...\nBOSS RUSH FREIGESCHALTET', 2200);
+      this.registry.set('royals', (this.registry.get('royals') as number) + 1);
     }
   }
 
@@ -491,6 +555,10 @@ export class GameScene extends Phaser.Scene {
     for (const b of this.blocks) {
       if (Math.abs(b.y - py) < 40 && (dir > 0 ? b.x - px > -8 && b.x - px < T.PUNCH_RANGE : px - b.x > -8 && px - b.x < T.PUNCH_RANGE)) b.bump();
     }
+    const bs = this.boss;
+    if (bs && bs.alive && Math.abs(bs.y - py) < 60 && (dir > 0 ? bs.body.left >= pb.center.x - 6 && bs.body.left <= pb.right + T.PUNCH_RANGE : bs.body.right <= pb.center.x + 6 && bs.body.right >= pb.left - T.PUNCH_RANGE)) {
+      bs.hit(T.BOSS_PUNCH_DMG); this.registry.set('bossHp', bs.hp); this.sparks.emitParticleAt(bs.x, bs.y - 30, 6); this.hitstop();
+    }
   }
 
   breakBrick(tile: Phaser.Tilemaps.Tile) {
@@ -530,6 +598,7 @@ export class GameScene extends Phaser.Scene {
       if (m.alive && Phaser.Math.Distance.Between(p.center.x, p.center.y, m.x, m.y) < T.CHORD_RADIUS) this.hitMob(m, Math.sign(m.x - p.center.x) || 1, true);
     }
     for (const b of this.blocks) if (Phaser.Math.Distance.Between(p.center.x, p.center.y, b.x, b.y) < T.CHORD_RADIUS) b.bump();
+    if (this.boss && this.boss.alive && Phaser.Math.Distance.Between(p.center.x, p.center.y, this.boss.x, this.boss.y) < T.CHORD_RADIUS) { this.boss.hit(T.BOSS_CHORD_DMG); this.registry.set('bossHp', this.boss.hp); }
     const r = T.CHORD_RADIUS;
     this.ground.getTilesWithinWorldXY(p.center.x - r, p.center.y - r, 2 * r, 2 * r).forEach((t) => { if (t.index === 19) this.breakBrick(t); });
     this.hitstop();
@@ -558,8 +627,121 @@ export class GameScene extends Phaser.Scene {
     this.waves.getChildren().slice().forEach((w) => { if ((w as Wave).owner === 'mob') w.destroy(); });
     this.pacifiers.getChildren().slice().forEach((k) => k.destroy());
     this.balls.getChildren().slice().forEach((b) => b.destroy());
+    this.glasses.getChildren().slice().forEach((g) => g.destroy());
+    this.rain.getChildren().slice().forEach((g) => g.destroy());
+    if (this.boss && this.boss.alive && view.contains(this.boss.x, this.boss.y - 20)) { this.boss.hit(T.BOSS_ULT_DMG); this.registry.set('bossHp', this.boss.hp); }
     this.events.emit('msg', 'KHUSRA MUND!', 900);
     this.hitstop();
+  }
+
+  // ------------------------------------------------------------ boss fight
+  private bossKick(x: number, y: number, dir: number) {
+    const arc = this.add.image(x + dir * 10, y, 'spr', 'fx_chord_0').setDepth(11).setScale(0.6).setTint(0xff4fa3).setFlipX(dir < 0);
+    this.tweens.add({ targets: arc, scale: 1.1, alpha: 0, duration: 260, onComplete: () => arc.destroy() });
+    const p = this.player.body;
+    if (Math.abs(p.center.y - y) < 50 && (dir > 0 ? p.left > x - 30 && p.left < x + 44 : p.right < x + 30 && p.right > x - 44)) this.damagePlayer(dir);
+  }
+
+  private bossRain(wave: number) {
+    const view = this.cameras.main.worldView;
+    const n = 5, gap = (wave * 2 + Phaser.Math.Between(0, 4)) % n;
+    audio.throw();
+    for (let i = 0; i < n; i++) {
+      if (i === gap) continue;
+      const x = view.left + 30 + (view.width - 60) * i / (n - 1) + Phaser.Math.Between(-8, 8);
+      this.rain.add(new RainCup(this, x, view.top - 24 - wave * 10));
+    }
+  }
+
+  private rainSplash(r: RainCup) {
+    audio.splash();
+    this.dust.emitParticleAt(r.x, r.y + 8, 5);
+    const pud = new Puddle(this, r.x, r.y + 10);
+    this.puddles.add(pud);
+    this.time.delayedCall(3000, () => { if (pud.active) { this.tweens.add({ targets: pud, alpha: 0, duration: 300, onComplete: () => pud.destroy() }); } });
+    r.destroy();
+  }
+
+  private bossPhase(p: number) {
+    const msg = p === 2 ? 'SAME GUY.\nDIFFERENT ENERGY.' : 'ALWAYS WATCHING.';
+    this.events.emit('msg', msg, 1600);
+    this.cameras.main.flash(350, 255, 79, 163);
+    this.cameras.main.shake(300, 0.01);
+    if (p === 3) this.cameras.main.setBackgroundColor('#170a10');
+    this.machinePhase = 0;
+  }
+
+  private playerVsBoss() {
+    const b = this.boss!;
+    if (!b.alive || this.player.dead || this.finished) return;
+    const p = this.player.body;
+    const stomp = p.velocity.y > 0 && p.bottom < b.body.top + 20;
+    if (stomp) {
+      const d = b.hit(T.BOSS_STOMP_DMG);
+      this.player.bounce();
+      this.hitstop();
+      this.sparks.emitParticleAt(b.x, b.body.top, 8);
+      this.registry.set('bossHp', b.hp);
+      void d;
+    } else if (!b.harmless) {
+      this.damagePlayer(Math.sign(this.player.x - b.x) || 1);
+    }
+  }
+
+  private projectileVsBoss(c: Phaser.Physics.Arcade.Sprite) {
+    const b = this.boss!;
+    if (!b.alive) return;
+    b.hit(T.BOSS_PROJ_DMG);
+    this.registry.set('bossHp', b.hp);
+    this.sparks.emitParticleAt(c.x, c.y, 6);
+    c.destroy();
+  }
+
+  private torchHit(c: Phaser.Physics.Arcade.Sprite, t: Phaser.Physics.Arcade.Sprite) {
+    if (t.getData('falling')) return;
+    t.setData('falling', true);
+    c.destroy();
+    audio.bump();
+    const b = this.boss;
+    const groundY = this.boss ? this.boss.homeY : t.y + 120;
+    this.tweens.add({ targets: t, y: groundY - 10, angle: t.x < (b?.x ?? 0) ? 80 : -80, duration: 420, ease: 'Quad.in', onComplete: () => {
+      this.dust.emitParticleAt(t.x, groundY, 8);
+      if (b && b.alive && Math.abs(b.x - t.x) < 56) { b.stun(T.BOSS_TORCH_STUN); this.events.emit('msg', 'FACKEL!  JETZT!', 900); this.cameras.main.shake(120, 0.006); }
+      this.tweens.add({ targets: t, alpha: 0, duration: 400, onComplete: () => {
+        t.setVisible(false); (t.body as Phaser.Physics.Arcade.StaticBody).enable = false;
+        this.time.delayedCall(12000, () => { if (!t.active) return; t.setPosition(t.x, t.getData('home')).setAngle(0).setAlpha(1).setVisible(true).setData('falling', false); (t.body as Phaser.Physics.Arcade.StaticBody).enable = true; (t.body as Phaser.Physics.Arcade.StaticBody).updateFromGameObject(); });
+      } });
+    } });
+  }
+
+  private useMachine() {
+    const b = this.boss;
+    if (!b || !b.alive || this.machinePhase === b.phase) return;
+    const hearts = this.registry.get('hearts') as number, max = this.registry.get('maxHearts') as number;
+    if (hearts >= max) return;
+    this.machinePhase = b.phase;
+    this.registry.set('hearts', hearts + 1);
+    audio.powerup();
+    this.events.emit('msg', 'KAFFEE-REFILL!', 800);
+    this.sparks.emitParticleAt(this.machine!.x, this.machine!.y - 30, 10);
+  }
+
+  private victory() {
+    if (this.bossDone) return;
+    this.bossDone = true;
+    audio.victory();
+    this.registry.set('bossHp', 0);
+    this.cameras.main.flash(500, 255, 224, 138);
+    this.events.emit('msg', 'END OF THE LEVEL.\nBEGINNING OF A LEGEND.', 2600);
+    this.glasses.getChildren().slice().forEach((g) => g.destroy());
+    this.rain.getChildren().slice().forEach((g) => g.destroy());
+    const b = this.boss!;
+    const belt = this.pickups.create(b.x, b.y - 20, 'spr', 'it_guertel_0') as Phaser.Physics.Arcade.Sprite;
+    belt.setDepth(12).setData('kind', 'guertel');
+    (belt.body as Phaser.Physics.Arcade.Body).setBounce(0.4).setVelocity(0, -200);
+    this.tweens.add({ targets: belt, alpha: 0.5, duration: 300, yoyo: true, repeat: -1 });
+    save.data.bossCleared = true; save.save();
+    if (this.flag) { this.flag.setVisible(true).setAlpha(0); (this.flag.body as Phaser.Physics.Arcade.StaticBody).enable = true; this.tweens.add({ targets: this.flag, alpha: 1, duration: 800 }); this.sparks.emitParticleAt(this.flag.x, this.flag.y - 30, 12); }
   }
 
   /** Trommler beat: every mob on screen gets a short speed burst. */
@@ -772,11 +954,9 @@ export class GameScene extends Phaser.Scene {
     if (nx.world > 0 && LEVELS.indexOf(nx) > LEVELS.findIndex((l) => l.key === this.levelKey)) save.unlock(nx.key);
     this.time.delayedCall(700, () => {
       this.physics.world.pause();
-      this.overlay = {
-        kind: 'result',
-        lines: ['CAMBIO!', '', `KARTEN   ${cards} / ${this.totalCards}`, `ZEIT     ${secs.toFixed(1)}s${newBest ? '  NEU!' : ''}`, noDmg ? 'OHNE SCHADEN  +500' : royals ? `ROYALS   ${royals}` : ''],
-        hint: 'TIPPEN FUER WEITER',
-      };
+      this.overlay = this.boss
+        ? { kind: 'result', lines: ['LEGENDE!', '', 'END OF THE LEVEL.', 'BEGINNING OF A LEGEND.', `ZEIT     ${secs.toFixed(1)}s`], hint: 'TIPPEN  -  ZURUECK ZUM ANFANG' }
+        : { kind: 'result', lines: ['CAMBIO!', '', `KARTEN   ${cards} / ${this.totalCards}`, `ZEIT     ${secs.toFixed(1)}s${newBest ? '  NEU!' : ''}`, noDmg ? 'OHNE SCHADEN  +500' : royals ? `ROYALS   ${royals}` : ''], hint: 'TIPPEN FUER WEITER' };
       this.events.emit('overlay', this.overlay);
     });
   }
@@ -840,6 +1020,13 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.movers.getChildren().forEach((p) => (p as MovingPlatform).tick());
+    if (this.boss) {
+      if (!this.player.dead) this.boss.update(dt * this.worldScale, this.player);
+      this.registry.set('bossHp', this.boss.hp);
+      this.glasses.getChildren().slice().forEach((g) => { const gl = g as Glasses; gl.tick(now); if (gl.expired(now)) gl.destroy(); });
+      this.rain.getChildren().slice().forEach((r) => { const rc = r as RainCup; if (rc.expired(now) || rc.y > this.map.heightInPixels + 50) rc.destroy(); });
+      if (this.boss.state === 'intro') this.player.controlLock = 100;
+    }
     this.cups.getChildren().slice().forEach((c) => { const cup = c as Cup; if (cup.expired(now) || cup.y > this.map.heightInPixels + 50) cup.destroy(); });
     this.homing.getChildren().slice().forEach((c) => { const hc = c as HomingCard; hc.steer(dt); if (hc.expired(now)) hc.destroy(); });
     this.waves.getChildren().slice().forEach((w) => { const wave = w as Wave; if (wave.expired(now)) wave.destroy(); });

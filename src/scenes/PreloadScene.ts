@@ -6,6 +6,7 @@ import tilesW1 from '../assets/tiles_w1.png';
 import tilesW2 from '../assets/tiles_w2.png';
 import tilesW3 from '../assets/tiles_w3.png';
 import tilesW4 from '../assets/tiles_w4.png';
+import tilesW5 from '../assets/tiles_w5.png';
 
 // Level files are imported as hashed URLs so the service worker can cache them safely.
 const LEVEL_URLS = import.meta.glob('../assets/levels/*.tmj', { query: '?url', import: 'default', eager: true }) as Record<string, string>;
@@ -38,6 +39,7 @@ export class PreloadScene extends Phaser.Scene {
     this.load.image('tiles_w2', tilesW2);
     this.load.image('tiles_w3', tilesW3);
     this.load.image('tiles_w4', tilesW4);
+    this.load.image('tiles_w5', tilesW5);
     this.load.spritesheet('tilesS', tilesW1, { frameWidth: 32, frameHeight: 32 });
     for (const l of LEVELS) {
       const file = l.file.replace(/^levels\//, '');
