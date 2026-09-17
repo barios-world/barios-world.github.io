@@ -27,6 +27,8 @@ export class Mob extends Phaser.Physics.Arcade.Sprite {
   onShout?: (x: number, y: number, dir: number) => void;
   onThrow?: (x: number, y: number, vx: number, vy: number) => void;
   onDrum?: () => void;
+  /** baby talk in a bubble (GameScene draws it) */
+  onSay?: (text: string) => void;
   speedMul = 1;
   /** temporary buff from a Fahnentraeger / Trommler beat */
   buff = 1;
@@ -100,7 +102,7 @@ export class Mob extends Phaser.Physics.Arcade.Sprite {
         else if (grounded && this.ledgeAhead()) this.dir = -this.dir;
         b.setVelocityX(this.dir * T.MOB_WALK * mul);
         if (!conf && !player.dead && adx < T.MOB_NOTICE && ady < 90 && Math.sign(dx) === this.dir) {
-          this.state = 'notice'; this.timer = 450; b.setVelocityX(0); audio.notice();
+          this.state = 'notice'; this.timer = 450; b.setVelocityX(0); audio.notice(); audio.say('baby', 'gaga'); this.onSay?.('GAGA?');
         }
         break;
       case 'notice':
@@ -112,18 +114,18 @@ export class Mob extends Phaser.Physics.Arcade.Sprite {
         if (keepDist && adx < keepDist) b.setVelocityX(0);               // Nuckel-Werfer keeps his distance
         else if (grounded && this.ledgeAhead()) b.setVelocityX(0);
         else b.setVelocityX(this.dir * T.MOB_RUN * mul);
-        if (!conf && ady < 70 && (keepDist ? adx < keepDist + 40 : adx < T.MOB_ATTACK_RANGE)) { this.state = 'attack'; this.timer = T.MOB_TELEGRAPH; b.setVelocityX(0); }
+        if (!conf && ady < 70 && (keepDist ? adx < keepDist + 40 : adx < T.MOB_ATTACK_RANGE)) { this.state = 'attack'; this.timer = T.MOB_TELEGRAPH; b.setVelocityX(0); audio.say('baby', 'waeh'); this.onSay?.(this.variant === 'nuckel' ? 'DADA!' : 'WÄÄH!'); }
         else if (adx > T.MOB_LOSE || player.dead || conf) this.state = 'patrol';
         break;
       case 'attack':
         b.setVelocityX(0);
         if (this.timer <= 0) {
           if (this.variant === 'nuckel') {
-            audio.throw();
+            audio.throw(); audio.say('baby', 'dada');
             const vx = Math.sign(dx) * Math.min(260, 120 + adx * 0.9), vy = -260 - Math.max(0, -(player.y - this.y)) * 1.5;
             this.onThrow?.(this.x + this.dir * 12, b.center.y - 10, vx, vy);
           } else {
-            audio.shout();
+            audio.shout(); audio.say('baby', 'meister'); this.onSay?.('MEITHHTER!');
             this.onShout?.(this.x + this.dir * 16, b.center.y - 4, this.dir);
           }
           this.state = 'cooldown'; this.timer = this.variant === 'nuckel' ? 1600 : 1100;
@@ -235,7 +237,7 @@ export class Mob extends Phaser.Physics.Arcade.Sprite {
     this.state = 'dead';
     this.body.enable = false;
     this.body.setVelocity(0, 0);
-    audio.stomp();
+    audio.stomp(); audio.say('baby', 'hick');
     this.prop?.setVisible(false);
     this.extra.forEach((e) => e.setVisible(false));
     const g = this.gfx;

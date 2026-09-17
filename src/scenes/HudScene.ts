@@ -215,9 +215,10 @@ export class HudScene extends Phaser.Scene {
     const jr = inp.jumpRect, ar = inp.attackRect;
     g.fillStyle(0xfff4dc, inp.jumpHeld ? 0.62 : 0.26).fillRoundedRect(jr.x, jr.y, jr.width, jr.height, 16 * u);
     const form = (this.registry.get('form') ?? 'base') as string;
-    const canAttack = (isForm(form) && FORMS[form].attack !== 'none') || gs.special === 'cambio' || full;
+    const pound = !!gs.player && !gs.player.grounded && inp.axisY > 0.5;
+    const canAttack = (isForm(form) && FORMS[form].attack !== 'none') || gs.special === 'cambio' || full || pound;
     g.fillStyle(full ? 0xff4fa3 : 0xff4fa3, full ? 0.85 : canAttack ? 0.5 : 0.18).fillRoundedRect(ar.x, ar.y, ar.width, ar.height, 12 * u);
     this.jumpLbl.setPosition(jr.centerX, jr.centerY);
-    this.atkLbl.setText(full ? 'KHUSRA\nMUND' : 'WURF').setPosition(ar.centerX, ar.centerY).setAlpha(canAttack ? 1 : 0.5);
+    this.atkLbl.setText(full ? 'KHUSRA\nMUND' : pound ? 'STAMPF' : 'WURF').setPosition(ar.centerX, ar.centerY).setAlpha(canAttack ? 1 : 0.5);
   }
 }

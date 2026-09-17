@@ -4,6 +4,53 @@ export interface Track { bpm: number; melody: number[]; bass: number[]; drums: s
 
 const midi = (n: number) => 440 * Math.pow(2, (n - 69) / 12);
 
+// ------------------------------------------------------------------ voices: Animalese-style syllable synth
+export type VoiceName = 'bario' | 'baby' | 'boss';
+type Vowel = 'a' | 'e' | 'i' | 'o' | 'u';
+interface Syl { p: number; d: number; v?: Vowel; glide?: number; hold?: boolean }
+interface VoiceProfile { base: number; type: OscillatorType; fscale: number; q: number; vib: number; vibRate: number; vol: number; noise: number; growl?: number; drive?: number }
+const VOWELS: Record<Vowel, [number, number]> = { a: [800, 1200], e: [500, 2000], i: [320, 2500], o: [500, 900], u: [350, 750] };
+const VOICES: Record<VoiceName, VoiceProfile> = {
+  bario: { base: 300, type: 'sawtooth', fscale: 1.0, q: 5, vib: 0.03, vibRate: 6.2, vol: 1.0, noise: 0.12 },           // bright, melodic, a little glamour
+  baby:  { base: 480, type: 'square', fscale: 1.35, q: 8, vib: 0.07, vibRate: 8.5, vol: 0.4, noise: 0.08 },             // whiny Meistersager babble
+  boss:  { base: 78, type: 'sawtooth', fscale: 0.72, q: 4, vib: 0.02, vibRate: 3.5, vol: 0.9, noise: 0.15, growl: 26, drive: 3 },  // Direktor: deep growl
+};
+/** Syllables: p = pitch multiplier, d = seconds, glide = pitch factor reached at the end. */
+export const PHRASES: Record<VoiceName, Record<string, Syl[]>> = {
+  bario: {
+    gracias:   [{ p: 1.0, d: 0.11, v: 'a' }, { p: 1.12, d: 0.1, v: 'i' }, { p: 1.4, d: 0.34, v: 'a', glide: 1.15, hold: true }],
+    aygracias: [{ p: 1.35, d: 0.14, v: 'a', glide: 0.85 }, { p: 1.0, d: 0.1, v: 'a' }, { p: 1.12, d: 0.1, v: 'i' }, { p: 1.45, d: 0.32, v: 'a', glide: 1.1, hold: true }],
+    fabuloso:  [{ p: 1.0, d: 0.1, v: 'a' }, { p: 1.05, d: 0.1, v: 'u' }, { p: 1.3, d: 0.12, v: 'o' }, { p: 1.15, d: 0.28, v: 'o', glide: 1.08, hold: true }],
+    querico:   [{ p: 1.25, d: 0.12, v: 'e' }, { p: 1.05, d: 0.1, v: 'i' }, { p: 1.4, d: 0.28, v: 'o', glide: 1.1, hold: true }],
+    si:        [{ p: 1.5, d: 0.14, v: 'i', glide: 1.25 }],
+    hola:      [{ p: 1.0, d: 0.12, v: 'o' }, { p: 1.3, d: 0.26, v: 'a', glide: 1.1, hold: true }],
+    vamos:     [{ p: 1.0, d: 0.11, v: 'a' }, { p: 1.25, d: 0.22, v: 'o', glide: 1.05 }],
+    khusra:    [{ p: 0.85, d: 0.13, v: 'u' }, { p: 0.78, d: 0.4, v: 'a', glide: 0.85, hold: true }],
+    ay:        [{ p: 1.4, d: 0.22, v: 'a', glide: 0.6 }],
+    noo:       [{ p: 1.1, d: 0.7, v: 'o', glide: 0.45, hold: true }],
+  },
+  baby: {
+    gaga:    [{ p: 1.0, d: 0.1, v: 'a' }, { p: 1.2, d: 0.16, v: 'a', glide: 1.25 }],
+    waeh:    [{ p: 1.3, d: 0.42, v: 'e', glide: 0.7, hold: true }],
+    meister: [{ p: 1.1, d: 0.1, v: 'e' }, { p: 1.35, d: 0.12, v: 'i', glide: 1.1 }, { p: 1.0, d: 0.2, v: 'e', glide: 0.8 }],
+    dada:    [{ p: 1.0, d: 0.09, v: 'a' }, { p: 0.95, d: 0.12, v: 'a' }],
+    hick:    [{ p: 1.8, d: 0.07, v: 'i', glide: 2.2 }],
+  },
+  boss: {
+    ruhe:     [{ p: 1.0, d: 0.16, v: 'u' }, { p: 0.95, d: 0.14, v: 'e' }, { p: 1.05, d: 0.12, v: 'i' }, { p: 0.9, d: 0.22, v: 'i' }, { p: 1.1, d: 0.14, v: 'a' }, { p: 1.0, d: 0.14, v: 'o' }, { p: 1.05, d: 0.12, v: 'i' }, { p: 0.8, d: 0.32, v: 'o', glide: 0.85, hold: true }],
+    brille:   [{ p: 1.1, d: 0.14, v: 'i' }, { p: 0.9, d: 0.24, v: 'e', glide: 0.9 }],
+    platz:    [{ p: 1.05, d: 0.12, v: 'a' }, { p: 1.0, d: 0.22, v: 'a', glide: 0.88 }],
+    zucker:   [{ p: 1.0, d: 0.14, v: 'u' }, { p: 0.85, d: 0.24, v: 'e', glide: 0.9 }],
+    kristall: [{ p: 1.05, d: 0.12, v: 'i' }, { p: 0.9, d: 0.26, v: 'a', glide: 0.88 }],
+    stampf:   [{ p: 1.0, d: 0.12, v: 'a' }, { p: 0.85, d: 0.26, v: 'a', glide: 0.8 }],
+    genug:    [{ p: 1.0, d: 0.12, v: 'e' }, { p: 0.8, d: 0.32, v: 'u', glide: 0.85, hold: true }],
+    chaos:    [{ p: 1.1, d: 0.16, v: 'a' }, { p: 0.85, d: 0.32, v: 'o', glide: 0.8, hold: true }],
+    haha:     [{ p: 1.0, d: 0.12, v: 'a' }, { p: 0.95, d: 0.12, v: 'a' }, { p: 0.9, d: 0.18, v: 'a', glide: 0.85 }],
+    argh:     [{ p: 1.2, d: 0.22, v: 'a', glide: 0.7 }],
+    nein:     [{ p: 1.0, d: 0.8, v: 'e', glide: 0.55, hold: true }],
+  },
+};
+
 /** World 1 – Der Boulevard: bouncy, C major, 124 bpm. One entry per eighth note (0 = rest). */
 export const TRACK_BOULEVARD: Track = {
   bpm: 124,
@@ -75,6 +122,8 @@ class Synth {
   private master?: GainNode;
   private sfxBus?: GainNode;
   private musicBus?: GainNode;
+  private voiceBus?: GainNode;
+  private lastSay: Record<string, number> = {};
   private noiseBuf?: AudioBuffer;
   sound = true;
   music = true;
@@ -91,6 +140,7 @@ class Synth {
       this.master = this.ctx.createGain(); this.master.gain.value = 0.9; this.master.connect(this.ctx.destination);
       this.sfxBus = this.ctx.createGain(); this.sfxBus.gain.value = 0.34; this.sfxBus.connect(this.master);
       this.musicBus = this.ctx.createGain(); this.musicBus.gain.value = 0.16; this.musicBus.connect(this.master);
+      this.voiceBus = this.ctx.createGain(); this.voiceBus.gain.value = 0.6; this.voiceBus.connect(this.master);
       const len = this.ctx.sampleRate * 0.5;
       this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
       const d = this.noiseBuf.getChannelData(0);
@@ -166,6 +216,73 @@ class Synth {
   notice() { this.sfx(() => this.tone('square', 880, 1320, 0.06, 0.25)); }
   click() { this.sfx(() => this.tone('square', 900, 700, 0.05, 0.2)); }
   pause() { this.sfx(() => [660, 440].forEach((f, i) => this.tone('square', f, f, 0.08, 0.25, i * 0.09))); }
+
+  // ------------------------------------------------------------------ voice lines
+  /** Speak a phrase in a character voice. Same-voice calls inside a short gap are dropped so pickups never stack. */
+  say(who: VoiceName, line: string) {
+    if (!this.sound || !this.ctx) return;
+    const phrase = PHRASES[who][line];
+    if (!phrase) return;
+    const now = this.ctx.currentTime;
+    if (now < (this.lastSay[who] ?? 0)) return;
+    const total = phrase.reduce((sum, y) => sum + y.d * 0.92, 0);
+    this.lastSay[who] = now + Math.max(0.25, total * 0.7);
+    let t = now + 0.01;
+    for (const syl of phrase) { this.syllable(VOICES[who], syl, t); t += syl.d * 0.92; }
+  }
+
+  private driveCurve(k: number) {
+    const n = 256, c = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const x = (i / (n - 1)) * 2 - 1; c[i] = Math.tanh(k * x) / Math.tanh(k); }
+    return c;
+  }
+
+  /** One syllable: oscillator -> vowel formants -> (drive) -> growl AM -> envelope. Consonant = short noise click. */
+  private syllable(v: VoiceProfile, s: Syl, t: number) {
+    const ctx = this.ctx!, out = this.voiceBus ?? this.sfxBus!;
+    const f = v.base * s.p;
+    const o = ctx.createOscillator(); o.type = v.type;
+    o.frequency.setValueAtTime(f * 1.12, t);
+    o.frequency.exponentialRampToValueAtTime(f, t + 0.03);
+    o.frequency.exponentialRampToValueAtTime(Math.max(20, f * (s.glide ?? 1)), t + s.d);
+    const lfo = ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = v.vibRate;
+    const lg = ctx.createGain(); lg.gain.value = f * v.vib * (s.hold ? 1.6 : 0.6);
+    lfo.connect(lg); lg.connect(o.frequency);
+    const [f1, f2] = VOWELS[s.v ?? 'a'];
+    const mix = ctx.createGain(); mix.gain.value = 1;
+    ([[f1 * v.fscale, 1], [f2 * v.fscale, 0.5]] as [number, number][]).forEach(([fc, g]) => {
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = fc; bp.Q.value = v.q;
+      const bg = ctx.createGain(); bg.gain.value = g;
+      o.connect(bp); bp.connect(bg); bg.connect(mix);
+    });
+    let last: AudioNode = mix;
+    if (v.drive) { const ws = ctx.createWaveShaper(); ws.curve = this.driveCurve(v.drive); last.connect(ws); last = ws; }
+    if (v.growl) {
+      const am = ctx.createGain(); am.gain.value = 1;
+      const g2 = ctx.createOscillator(); g2.frequency.value = v.growl;
+      const gg = ctx.createGain(); gg.gain.value = 0.45;
+      g2.connect(gg); gg.connect(am.gain);
+      last.connect(am); last = am;
+      g2.start(t); g2.stop(t + s.d + 0.05);
+    }
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(v.vol, t + 0.02);
+    env.gain.setValueAtTime(v.vol, t + Math.max(0.02, s.d - 0.06));
+    env.gain.exponentialRampToValueAtTime(0.0001, t + s.d);
+    last.connect(env); env.connect(out);
+    this.noise(0.025, v.noise, v.base > 200 ? 1800 : 300, 0, out, t);
+    o.start(t); o.stop(t + s.d + 0.05);
+    lfo.start(t); lfo.stop(t + s.d + 0.05);
+  }
+
+  // ------------------------------------------------------------------ M8 sound effects
+  tick() { this.sfx(() => this.tone('square', 1500, 1500, 0.03, 0.18)); }
+  flip() { this.sfx(() => { this.noise(0.12, 0.2, 2200); this.tone('triangle', 500, 900, 0.12, 0.2); }); }
+  pound() { this.sfx(() => { this.noise(0.22, 0.25, 900); this.tone('sawtooth', 700, 150, 0.22, 0.25); }); }
+  slam() { this.sfx(() => { this.tone('sine', 140, 40, 0.28, 0.7); this.noise(0.14, 0.4, 200); this.tone('square', 90, 60, 0.2, 0.3, 0.02); }); }
+  chain(n: number) { this.sfx(() => { const f = 520 * Math.pow(1.122, Math.min(n, 8)); this.tone('square', f, f * 1.5, 0.1, 0.35); this.tone('square', f * 1.5, f * 2, 0.08, 0.25, 0.07); }); }
+  sparkle() { this.sfx(() => [1047, 1319, 1568, 2093].forEach((f, i) => this.tone('triangle', f, f * 1.02, 0.08, 0.2, i * 0.04))); }
 
   // ------------------------------------------------------------------ music sequencer
   play(track: Track) {

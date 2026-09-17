@@ -3,9 +3,10 @@ import { T } from '../config/Tuning';
 import { audio } from '../systems/Audio';
 
 export type BossState = 'intro' | 'idle' | 'walk' | 'tele_glasses' | 'tele_kick' | 'dash' | 'kick' | 'open' | 'tele_rain' | 'rain'
-  | 'tele_crystal' | 'crystal' | 'teleport' | 'transition' | 'stunned' | 'dead';
+  | 'tele_crystal' | 'crystal' | 'tele_slam' | 'slam' | 'teleport' | 'transition' | 'stunned' | 'dead';
 
-/** Der Direktor – final boss. Three phases, telegraphed attacks, a 1.2 s window after every combo. */
+/** Der Direktor – final boss. Three phases, telegraphed attacks, a short open window after every combo.
+ *  He only takes stomps while open or stunned (Assist: also while walking). */
 export class Direktor extends Phaser.Physics.Arcade.Sprite {
   declare body: Phaser.Physics.Arcade.Body;
   gfx: Phaser.GameObjects.Sprite;
@@ -22,12 +23,17 @@ export class Direktor extends Phaser.Physics.Arcade.Sprite {
   homeY: number;
   rainWave = 0;
   crystalIdx = 0;
+  assist = false;
+  private slamAir = false;
+  private hitSayAt = 0;
   onGlasses?: (x: number, y: number, dir: number) => void;
   onKick?: (x: number, y: number, dir: number) => void;
   onRain?: (wave: number) => void;
   onCrystal?: (x: number, y: number) => void;
+  onSlam?: (x: number, y: number) => void;
   onPhase?: (phase: number) => void;
   onTeleport?: (x: number) => void;
+  onSay?: (line: string, text: string) => void;
   onDead?: () => void;
 
   constructor(scene: Phaser.Scene, x: number, groundY: number) {
@@ -45,14 +51,17 @@ export class Direktor extends Phaser.Physics.Arcade.Sprite {
   }
 
   get alive() { return this.state !== 'dead'; }
-  /** Bario can hurt him now (and takes no contact damage). */
-  get vulnerable() { return this.state === 'open' || this.state === 'stunned' || this.state === 'idle' || this.state === 'walk'; }
+  /** Bario can hurt him now. */
+  get vulnerable() { return this.state === 'open' || this.state === 'stunned' || (this.assist && (this.state === 'idle' || this.state === 'walk')); }
   get harmless() { return this.state === 'open' || this.state === 'stunned' || this.state === 'teleport' || this.state === 'transition' || this.state === 'dead' || this.state === 'intro'; }
 
-  private speedMul() { return this.phase === 3 ? 1.35 : this.phase === 2 ? 1.15 : 1; }
+  private speedMul() { return this.phase === 3 ? 1.5 : this.phase === 2 ? 1.2 : 1; }
   private tele(ms: number) { return ms / this.speedMul(); }
+  /** open windows shrink per phase */
+  private openMs(base: number) { return this.phase === 1 ? base : this.phase === 2 ? base * 0.8 : base * 0.65; }
 
   private go(s: BossState, ms: number) { this.state = s; this.timer = ms; }
+  private sayLine(line: string, text: string) { this.onSay?.(line, text); }
 
   private setFrame2(name: string, originX = 0.5, originY = 58 / 64) {
     const g = this.gfx;
@@ -66,12 +75,12 @@ export class Direktor extends Phaser.Physics.Arcade.Sprite {
     const dx = player.x - this.x;
     const adx = Math.abs(dx);
     this.timer -= dt * 1000;
-    if (this.state !== 'dash' && this.state !== 'teleport') this.dir = Math.sign(dx) || this.dir;
+    if (this.state !== 'dash' && this.state !== 'teleport' && this.state !== 'slam') this.dir = Math.sign(dx) || this.dir;
 
     switch (this.state) {
       case 'intro':
         b.setVelocityX(0);
-        if (this.timer <= 0) this.go('idle', 400);
+        if (this.timer <= 0) { this.sayLine('ruhe', 'RUHE IM SPIEL,\nCHAOS IM KOPF.'); this.go('idle', 900); }
         break;
       case 'idle':
         b.setVelocityX(0);
@@ -86,7 +95,7 @@ export class Direktor extends Phaser.Physics.Arcade.Sprite {
         if (this.timer <= 0) {
           audio.glasses();
           this.onGlasses?.(this.x + this.dir * 14, b.center.y - 12, this.dir);
-          this.go('open', this.phase === 1 ? 900 : 700);
+          this.go('open', this.openMs(900));
         }
         break;
       case 'tele_kick':
@@ -101,11 +110,14 @@ export class Direktor extends Phaser.Physics.Arcade.Sprite {
         }
         break;
       case 'kick':
-        if (this.timer <= 0) { b.setVelocityX(0); this.go('open', 1200); }
+        if (this.timer <= 0) { b.setVelocityX(0); this.go('open', this.openMs(1100)); }
         break;
       case 'open':
         b.setVelocityX(0);
-        if (this.timer <= 0) this.go('idle', 300);
+        if (this.timer <= 0) {
+          if (this.phase === 3 && Math.random() < 0.35) this.choose(adx, true);   // phase 3 chains attacks
+          else this.go('idle', 300);
+        }
         break;
       case 'tele_rain':
         b.setVelocityX(0);
@@ -115,7 +127,7 @@ export class Direktor extends Phaser.Physics.Arcade.Sprite {
         b.setVelocityX(0);
         if (this.timer <= 0) {
           if (this.rainWave < 3) { this.onRain?.(this.rainWave++); this.timer = 520; }
-          else this.go('open', 1000);
+          else this.go('open', this.openMs(1000));
         }
         break;
       case 'tele_crystal':
@@ -126,7 +138,19 @@ export class Direktor extends Phaser.Physics.Arcade.Sprite {
         b.setVelocityX(0);
         if (this.timer <= 0) {
           if (this.crystalIdx < 6) { this.onCrystal?.(this.x + this.dir * (40 + this.crystalIdx * 46), this.homeY); this.crystalIdx++; this.timer = 130; }
-          else this.go('open', 900);
+          else this.go('open', this.openMs(900));
+        }
+        break;
+      case 'tele_slam':
+        b.setVelocityX(0);
+        if (this.timer <= 0) { this.go('slam', 1500); this.slamAir = false; b.setVelocity(this.dir * 230 * this.speedMul(), -640); }
+        break;
+      case 'slam':
+        if (!b.blocked.down) this.slamAir = true;
+        else if (this.slamAir || this.timer <= 0) {
+          b.setVelocityX(0);
+          this.onSlam?.(b.center.x, b.bottom);
+          this.go('open', this.openMs(1000));
         }
         break;
       case 'teleport':
@@ -137,7 +161,8 @@ export class Direktor extends Phaser.Physics.Arcade.Sprite {
           b.reset(nx, this.homeY - 26);
           this.gfx.setAlpha(1);
           this.dir = Math.sign(player.x - nx) || 1;
-          this.go(Math.random() < 0.5 ? 'tele_glasses' : 'tele_kick', this.tele(350));
+          if (Math.random() < 0.5) { this.sayLine('brille', 'BRILLE!'); this.go('tele_glasses', this.tele(350)); }
+          else { this.sayLine('platz', 'PLATZ DA!'); this.go('tele_kick', this.tele(350)); }
         }
         break;
       case 'transition':
@@ -163,6 +188,7 @@ export class Direktor extends Phaser.Physics.Arcade.Sprite {
 
   private applyTint() {
     if (this.state === 'stunned') this.gfx.setTint(0x9fd8f0);
+    else if (this.state === 'open') this.gfx.setTint(0xffe7a8);          // open window: warm highlight = hit him now
     else if (this.phase >= 2) this.gfx.setTint(0xffb3d4);
     else this.gfx.clearTint();
   }
@@ -170,13 +196,17 @@ export class Direktor extends Phaser.Physics.Arcade.Sprite {
   /** Pick the next pattern based on phase and distance. */
   private choose(adx: number, afterWalk = false) {
     const r = Math.random();
-    if (this.phase === 3 && r < 0.35) { audio.teleport(); this.go('teleport', 300); this.scene.tweens.add({ targets: this.gfx, alpha: 0, duration: 250 }); return; }
-    if (this.phase >= 2 && r < 0.55) {
-      if (Math.random() < 0.5) this.go('tele_rain', this.tele(600)); else this.go('tele_crystal', this.tele(500));
+    if (this.phase === 3 && r < 0.3) { audio.teleport(); this.go('teleport', 300); this.scene.tweens.add({ targets: this.gfx, alpha: 0, duration: 250 }); return; }
+    if (this.phase >= 2 && r < 0.6) {
+      const k = Math.random();
+      if (k < 0.34) { this.sayLine('zucker', 'MEHR ZUCKER!'); this.go('tele_rain', this.tele(600)); }
+      else if (k < 0.67) { this.sayLine('kristall', 'KRISTALL!'); this.go('tele_crystal', this.tele(500)); }
+      else { this.sayLine('stampf', 'STAMPF!'); this.go('tele_slam', this.tele(450)); }
       return;
     }
     if (adx > 170 && !afterWalk) { this.go('walk', 1500); return; }
-    if (Math.random() < 0.55) this.go('tele_glasses', this.tele(500)); else this.go('tele_kick', this.tele(420));
+    if (Math.random() < 0.55) { this.sayLine('brille', 'BRILLE!'); this.go('tele_glasses', this.tele(500)); }
+    else { this.sayLine('platz', 'PLATZ DA!'); this.go('tele_kick', this.tele(420)); }
   }
 
   private animate() {
@@ -187,10 +217,10 @@ export class Direktor extends Phaser.Physics.Arcade.Sprite {
         g.setOrigin(0.5, 58 / 64);
         break;
       case 'tele_glasses': this.setFrame2('direktor_brille_0', 24 / 80, 58 / 64); break;
-      case 'kick': this.setFrame2('direktor_kick_0', 24 / 72, 58 / 64); break;
+      case 'kick': case 'slam': this.setFrame2('direktor_kick_0', 24 / 72, 58 / 64); break;
       case 'tele_rain': case 'rain': this.setFrame2('direktor_regen_0', (16 + 20) / 72, 58 / 64); break;
       case 'transition': this.setFrame2('direktor_rage_0', 0.5, 58 / 64); break;
-      case 'tele_kick': case 'tele_crystal': case 'crystal': this.setFrame2('direktor_idle_1', 0.5, 58 / 64); break;
+      case 'tele_kick': case 'tele_crystal': case 'crystal': case 'tele_slam': this.setFrame2('direktor_idle_1', 0.5, 58 / 64); break;
       default:
         if (g.anims.currentAnim?.key !== 'direktor_idle' || !g.anims.isPlaying) g.play('direktor_idle', true);
         g.setOrigin(0.5, 58 / 64);
@@ -205,10 +235,17 @@ export class Direktor extends Phaser.Physics.Arcade.Sprite {
     this.hp = Math.max(0, this.hp - real);
     this.flashUntil = this.scene.time.now + 120;
     audio.bossHit();
+    if (this.scene.time.now > this.hitSayAt) { this.hitSayAt = this.scene.time.now + 700; this.sayLine('argh', ''); }
     if (this.hp <= 0) { this.die(); return real; }
     if (this.phase === 1 && this.hp <= 66) this.enterPhase(2);
     else if (this.phase === 2 && this.hp <= 33) this.enterPhase(3);
     return real;
+  }
+
+  /** A stomp outside the open window: he shrugs it off and laughs. */
+  blockStomp() {
+    this.flashUntil = this.scene.time.now + 60;
+    this.sayLine('haha', 'HA HA HA!');
   }
 
   stun(ms: number) {
@@ -222,6 +259,7 @@ export class Direktor extends Phaser.Physics.Arcade.Sprite {
     audio.phase();
     this.go('transition', 1300);
     this.body.setVelocityX(0);
+    this.sayLine(p === 2 ? 'genug' : 'chaos', p === 2 ? 'GENUG!' : 'CHAOS IM KOPF!');
     this.onPhase?.(p);
     if (p === 3 && this.ghosts.length === 0) {
       for (let i = 0; i < 2; i++) {
@@ -236,6 +274,7 @@ export class Direktor extends Phaser.Physics.Arcade.Sprite {
     this.body.enable = false;
     this.ghosts.forEach((g) => g.destroy());
     this.ghosts = [];
+    this.sayLine('nein', 'NEIN...');
     const g = this.gfx;
     g.anims.stop(); g.clearTint();
     g.setTexture('spr', 'direktor_idle_0').setOrigin(0.5, 58 / 64);

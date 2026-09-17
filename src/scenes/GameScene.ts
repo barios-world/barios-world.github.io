@@ -78,6 +78,10 @@ export class GameScene extends Phaser.Scene {
   cardFan = 5;
   wissen = 0;
   royalSparkAt = 0;
+  /** comic speech bubbles that follow their speaker */
+  private bubbles: { c: Phaser.GameObjects.Container; target: { body: { center: { x: number }; top: number } } }[] = [];
+  thankUntil = 0;
+  stompChain = 0;
 
   constructor() { super('game'); }
 
@@ -103,6 +107,9 @@ export class GameScene extends Phaser.Scene {
     this.machine = undefined;
     this.machinePhase = 0;
     this.bossDone = false;
+    this.bubbles = [];
+    this.thankUntil = 0;
+    this.stompChain = 0;
     this.registry.set('bossHp', -1);
     if (save.settings.reduceFx) {
       // Barrierefreiheit: keine Blitze, kein Wackeln (Hitstop entfaellt in hitstop()).
@@ -249,7 +256,8 @@ export class GameScene extends Phaser.Scene {
     this.player.spawnAt(this.spawn.x, this.spawn.y + 16);
     const f = this.registry.get('form') as string;
     this.player.setForm(isForm(f) ? f : 'base');
-    this.player.onLand = (x, y, speed) => this.dust.emitParticleAt(x, y, speed > 8 ? 8 : 4);
+    this.player.onLand = (x, y, speed) => { this.dust.emitParticleAt(x, y, speed > 8 ? 8 : 4); this.stompChain = 0; };
+    this.player.onPound = (x, y) => this.poundImpact(x, y);
     this.player.onJump = (x, y) => this.dust.emitParticleAt(x, y, 4);
     this.player.onAttack = (form, x, y, dir) => this.attack(form, x, y, dir);
 
@@ -259,6 +267,7 @@ export class GameScene extends Phaser.Scene {
       m.onShout = (sx, sy, dir) => this.waves.add(new Wave(this, sx, sy, dir, 'mob'));
       m.onThrow = (sx, sy, vx, vy) => this.pacifiers.add(new Pacifier(this, sx, sy, vx, vy));
       m.onDrum = () => this.drumBeat();
+      m.onSay = (text) => this.say(m, text, 'baby');
       this.mobs.push(m);
       this.mobGroup.add(m);
     }
@@ -275,6 +284,9 @@ export class GameScene extends Phaser.Scene {
       b.onPhase = (p) => this.bossPhase(p);
       b.onTeleport = (x) => { this.sparks.emitParticleAt(b.x, b.y - 30, 8); this.sparks.emitParticleAt(x, b.y - 30, 8); };
       b.onDead = () => this.victory();
+      b.assist = save.settings.assist;
+      b.onSay = (line, text) => { audio.say('boss', line); if (text) this.say(b, text, 'boss'); };
+      b.onSlam = (x, y) => this.bossSlam(x, y);
       this.registry.set('bossHp', 100);
       if (this.flag) { this.flag.setVisible(false); (this.flag.body as Phaser.Physics.Arcade.StaticBody).enable = false; }
       this.physics.add.overlap(this.player, b, () => this.playerVsBoss());
@@ -290,7 +302,7 @@ export class GameScene extends Phaser.Scene {
       this.physics.add.overlap(this.homing, this.torches, (c, t) => this.torchHit(c as Phaser.Physics.Arcade.Sprite, t as Phaser.Physics.Arcade.Sprite));
       if (this.machine) this.physics.add.overlap(this.player, this.machine, () => this.useMachine());
       if (this.rush) { b.timer = 700; this.time.delayedCall(200, () => this.events.emit('msg', 'BOSS RUSH!\nDIE ZEIT LAEUFT.', 1400)); }
-      else this.time.delayedCall(300, () => this.events.emit('msg', 'DER DIREKTOR\n\nRUHE IM SPIEL, CHAOS IM KOPF.', 2200));
+      else this.time.delayedCall(300, () => this.events.emit('msg', 'DER DIREKTOR', 1200));
       this.cameras.main.flash(400, 40, 10, 20);
     }
 
@@ -358,6 +370,9 @@ export class GameScene extends Phaser.Scene {
     this.game.events.on(Phaser.Core.Events.HIDDEN, this.onHidden, this);
     this.events.once('shutdown', () => this.game.events.off(Phaser.Core.Events.HIDDEN, this.onHidden, this));
     this.events.emit('msg', level.name, 1500);
+    this.time.delayedCall(700, () => { if (!this.player.dead && !this.finished) { audio.say('bario', 'vamos'); this.say(this.player, '¡VAMOS!', 'bario'); } });
+    if (this.solids.getChildren().some((s) => s instanceof CardPlatform)) this.time.delayedCall(2200, () => this.events.emit('msg', 'KARTE BLINKT = GLEICH OFFEN!', 1600));
+    else if (this.levelKey === 'lvl_w1_1' || this.levelKey === 'lvl_w1_2') this.time.delayedCall(2400, () => this.events.emit('msg', 'TIPP: IN DER LUFT  RUNTER + WURF\n= STAMPF!', 1900));
     this.events.emit('overlay', null);
     this.input.on('pointerdown', this.onTapOverlay, this);
     this.input.keyboard?.on('keydown-SPACE', this.onTapOverlay, this);
@@ -409,6 +424,7 @@ export class GameScene extends Phaser.Scene {
       const c = this.add.image(blk.x, blk.y - 16, 'spr', 'it_karte_0').setDepth(12);
       this.tweens.add({ targets: c, y: blk.y - 70, duration: 260, ease: 'Quad.out', yoyo: true, onComplete: () => c.destroy() });
       this.bankCards(1, blk.x, blk.y - 40, false);
+      this.thank(false);
       return;
     }
     const icon = isForm(what) ? FORMS[what].icon : isSpecial(what) ? SPECIALS[what].icon : 'it_kaffee_0';
@@ -429,11 +445,14 @@ export class GameScene extends Phaser.Scene {
     if (isForm(kind)) {
       this.player.setForm(kind);
       audio.powerup();
+      audio.say('bario', 'si'); this.say(this.player, '¡SÍ!', 'bario');
       this.events.emit('msg', FORMS[kind].msg, 1600);
     } else if (isSpecial(kind)) {
       this.startSpecial(kind);
+      audio.say('bario', 'fabuloso'); this.say(this.player, '¡FABULOSO!', 'bario');
     } else if (kind === 'guertel') {
       audio.special();
+      audio.say('bario', 'aygracias'); this.say(this.player, '¡AY, GRACIAS!', 'bario'); this.rainbowBurst(this.player.body.center.x, this.player.body.top + 10, 10);
       this.events.emit('msg', 'DER GUERTEL!  ER VERLIERT IHN NIE...\nBOSS RUSH FREIGESCHALTET', 2200);
       this.registry.set('royals', (this.registry.get('royals') as number) + 1);
     }
@@ -618,6 +637,7 @@ export class GameScene extends Phaser.Scene {
     this.khusra = 0;
     this.registry.set('khusra', 0);
     audio.khusra();
+    audio.say('bario', 'khusra'); this.say(this.player, 'KHUSRA!', 'bario', 1000, true);
     this.updateAura();
     const p = this.player;
     p.posUntil = this.time.now + 450;
@@ -687,12 +707,19 @@ export class GameScene extends Phaser.Scene {
     const p = this.player.body;
     const stomp = p.velocity.y > 0 && p.bottom < b.body.top + 20;
     if (stomp) {
-      const d = b.hit(T.BOSS_STOMP_DMG);
+      const pound = this.player.pounding;
+      if (pound) { this.player.pounding = false; this.player.gfx.setAngle(0); }
+      if (b.vulnerable) {
+        b.hit(pound ? T.BOSS_STOMP_DMG * 1.5 : T.BOSS_STOMP_DMG);
+        this.registry.set('bossHp', b.hp);
+        this.sparks.emitParticleAt(b.x, b.body.top, 8);
+        this.hitstop();
+      } else {
+        b.blockStomp();                       // not open: he shrugs it off and laughs
+        audio.bump();
+        this.dust.emitParticleAt(b.x, b.body.top, 4);
+      }
       this.player.bounce();
-      this.hitstop();
-      this.sparks.emitParticleAt(b.x, b.body.top, 8);
-      this.registry.set('bossHp', b.hp);
-      void d;
     } else if (!b.harmless) {
       this.damagePlayer(Math.sign(this.player.x - b.x) || 1);
     }
@@ -761,6 +788,78 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.shake(60, 0.002);
   }
 
+  // ------------------------------------------------------------ voice, bubbles, Stampf
+  /** Comic speech bubble above a speaker (Bario, Meistersager, Direktor); follows them while visible. */
+  say(target: { body: { center: { x: number }; top: number } }, text: string, who: 'bario' | 'baby' | 'boss', ms = who === 'boss' ? 1500 : 900, big = who === 'boss') {
+    const z = this.cameras.main.zoom || 1;
+    const style = who === 'bario' ? { fill: 0xfff4dc, color: '#FF4FA3' } : who === 'baby' ? { fill: 0xeaf6ff, color: '#2B0715' } : { fill: 0x4a1f2c, color: '#FFC24B' };
+    const t = this.add.text(0, 0, text, { fontFamily: '"Press Start 2P", monospace', fontSize: `${(big ? 7 : 5) * z}px`, color: style.color, align: 'center' }).setOrigin(0.5).setScale(1 / z);
+    const w = t.width / z + 12, h = t.height / z + 8;
+    const g = this.add.graphics();
+    g.fillStyle(style.fill, 1).fillRoundedRect(-w / 2, -h - 7, w, h, 3);
+    g.fillTriangle(-4, -7, 4, -7, 0, -1);
+    g.lineStyle(1, 0x14100e, 0.9).strokeRoundedRect(-w / 2, -h - 7, w, h, 3);
+    t.setPosition(0, -h / 2 - 7);
+    const c = this.add.container(target.body.center.x, target.body.top - 4, [g, t]).setDepth(31).setScale(0.2);
+    this.tweens.add({ targets: c, scale: 1, duration: 140, ease: 'Back.out' });
+    this.bubbles.push({ c, target });
+    this.time.delayedCall(ms, () => { if (c.active) this.tweens.add({ targets: c, alpha: 0, duration: 160, onComplete: () => c.destroy() }); });
+  }
+
+  /** Bario says thank you for his cards – rate-limited so an arc of cards is one fabulous gracias, not five. */
+  private thank(royal: boolean) {
+    const now = this.time.now;
+    if (!royal && now < this.thankUntil) return;
+    this.thankUntil = now + 1400;
+    const lines: [string, string][] = royal ? [['aygracias', '¡AY, GRACIAS!']] : [['gracias', '¡GRACIAS!'], ['gracias', '¡GRACIAS!'], ['fabuloso', '¡FABULOSO!'], ['querico', '¡QUÉ RICO!']];
+    const [line, text] = Phaser.Utils.Array.GetRandom(lines);
+    audio.say('bario', line);
+    this.say(this.player, text, 'bario');
+    this.rainbowBurst(this.player.body.center.x, this.player.body.top + 10, royal ? 10 : 6);
+  }
+
+  /** Bario's little rainbow: tinted sparks in a fan + a heart. */
+  rainbowBurst(x: number, y: number, n = 6) {
+    const cols = [0xe8434f, 0xff9f1c, 0xffc24b, 0x63b84e, 0x3a7bd5, 0x9b5de5];
+    for (let i = 0; i < n; i++) {
+      const a = Math.PI * (1.15 + 0.7 * i / Math.max(1, n - 1));
+      const s = this.add.image(x, y, 'spr', 'fx_spark_0').setDepth(30).setTint(cols[i % cols.length]).setScale(0.9);
+      this.tweens.add({ targets: s, x: x + Math.cos(a) * 34, y: y + Math.sin(a) * 34, alpha: 0, scale: 0.3, duration: 420, ease: 'Quad.out', onComplete: () => s.destroy() });
+    }
+    const h = this.add.image(x + 10, y - 6, 'spr', 'herz_s_0').setDepth(30).setScale(0.8);
+    this.tweens.add({ targets: h, y: y - 34, alpha: 0, duration: 600, ease: 'Sine.out', onComplete: () => h.destroy() });
+  }
+
+  /** Stampf landing: shockwave kills mobs around, breaks bricks and bumps blocks under the feet, shatters crystals. */
+  poundImpact(x: number, y: number) {
+    audio.slam();
+    this.cameras.main.shake(180, 0.01);
+    this.dust.emitParticleAt(x, y, 14);
+    const ring = this.add.image(x, y - 4, 'spr', 'fx_ring_0').setDepth(13).setScale(0.5).setAlpha(0.9).setTint(0xffe08a);
+    this.tweens.add({ targets: ring, scaleX: 3.2, scaleY: 1.2, alpha: 0, duration: 320, ease: 'Quad.out', onComplete: () => ring.destroy() });
+    for (const m of this.mobs) {
+      if (!m.alive || Math.abs(m.x - x) > T.POUND_RADIUS || Math.abs(m.body.bottom - y) > 48) continue;
+      if (m.variant === 'fanblock') m.loseMember(); else m.kill();
+      if (!m.alive) this.addKhusra(T.KHUSRA_KILL);
+      this.sparks.emitParticleAt(m.x, m.y - 30, 8);
+    }
+    for (const dx of [-14, 14]) { const t = this.ground.getTileAtWorldXY(x + dx, y + 8, true); if (t && t.index === 19) this.breakBrick(t); }
+    for (const blk of this.blocks) if (Math.abs(blk.x - x) < 24 && Math.abs((blk.body as Phaser.Physics.Arcade.StaticBody).top - y) < 12) blk.bump();
+    this.crystals.getChildren().slice().forEach((c) => { const cr = c as Crystal; if (Math.abs(cr.x - x) < T.POUND_RADIUS) { this.sparks.emitParticleAt(cr.x, cr.y, 6); cr.destroy(); } });
+    this.hitstop();
+  }
+
+  /** Direktor's Zuckerstampf: ground shockwaves to both sides – jump over them. */
+  private bossSlam(x: number, y: number) {
+    audio.slam();
+    this.cameras.main.shake(320, 0.014);
+    this.dust.emitParticleAt(x, y, 16);
+    const ring = this.add.image(x, y - 6, 'spr', 'fx_ring_0').setDepth(13).setScale(0.6).setAlpha(0.9).setTint(0xff4fa3);
+    this.tweens.add({ targets: ring, scaleX: 4, scaleY: 1.4, alpha: 0, duration: 380, ease: 'Quad.out', onComplete: () => ring.destroy() });
+    for (const dir of [-1, 1]) this.waves.add(new Wave(this, x + dir * 24, y - 14, dir, 'mob', 1.4));
+    if (this.player.grounded && Math.abs(this.player.x - x) < 60) this.damagePlayer(Math.sign(this.player.x - x) || 1);
+  }
+
   // ------------------------------------------------------------ cards
   /** Floating score text in world space, rendered crisp for the current camera zoom. */
   pop(x: number, y: number, s: string, color = '#FFF4DC') {
@@ -792,6 +891,7 @@ export class GameScene extends Phaser.Scene {
     if (royal) { this.registry.inc('royals', 1); this.sparks.emitParticleAt(c.x, c.y, 12); this.events.emit('msg', 'ROYAL!', 700); }
     c.destroy();
     this.bankCards(v, c.x, c.y, royal);
+    this.thank(royal);
   }
 
   hitCheckpoint(c: Phaser.Physics.Arcade.Sprite) {
@@ -818,6 +918,9 @@ export class GameScene extends Phaser.Scene {
         this.addKhusra(T.KHUSRA_KILL);
         this.player.bounce();
         this.registry.inc('stomps', 1);
+        this.stompChain++;
+        if (this.stompChain >= 2) { this.pop(m.x, m.body.top - 22, `x${this.stompChain}`, '#FFC24B'); this.addKhusra(T.STOMP_CHAIN_KHUSRA * this.stompChain); audio.chain(this.stompChain); }
+        this.sparks.emitParticleAt(m.x, m.body.top, 6);
       }
       this.hitstop();
       this.dust.emitParticleAt(m.x, m.body.top, 6);
@@ -916,6 +1019,7 @@ export class GameScene extends Phaser.Scene {
     if (this.player.dead) return;
     this.player.dead = true;
     audio.die();
+    audio.say('bario', 'noo');
     if (!save.settings.assist) this.registry.inc('lives', -1);
     const lives = this.registry.get('lives') as number;
     this.cameras.main.shake(160, 0.01);
@@ -959,6 +1063,7 @@ export class GameScene extends Phaser.Scene {
     if (this.finished) return;
     this.finished = true;
     audio.clear();
+    audio.say('bario', 'gracias'); this.say(this.player, '¡GRACIAS!', 'bario');
     const secs = ((this.time.now - this.startTime) / 1000);
     const cards = this.registry.get('cards') as number;
     const noDmg = !this.tookDamage;
@@ -1087,6 +1192,8 @@ export class GameScene extends Phaser.Scene {
       });
     }
     if (now > this.punchComboUntil) this.punchCombo = 0;
+    for (const bb of this.bubbles) if (bb.c.active) bb.c.setPosition(Math.round(bb.target.body.center.x), Math.round(bb.target.body.top - 4));
+    if (this.bubbles.length) this.bubbles = this.bubbles.filter((bb) => bb.c.active);
 
     const cam = this.cameras.main;
     this.lookX = Phaser.Math.Linear(this.lookX, -this.player.facing * T.CAM_LOOKAHEAD, 0.08);

@@ -5,6 +5,8 @@ import { save } from './Save';
 /** Unified input: keyboard (Mac test) + touch (floating stick on one half, jump/attack on the other). All coords in canvas px. */
 export class InputSystem {
   axis = 0;
+  /** stick/keys down = +1 (Stampf in the air) */
+  axisY = 0;
   jumpHeld = false;
   jumpPressed = false;
   attackPressed = false;
@@ -24,6 +26,7 @@ export class InputSystem {
   private stickPointerId = -1;
   private jumpPointerId = -1;
   private touchAxis = 0;
+  private touchAxisY = 0;
   private jumpWasHeld = false;
   private jumpQueued = false;
   private attackQueued = false;
@@ -32,7 +35,7 @@ export class InputSystem {
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
     const kb = scene.input.keyboard!;
-    this.keys = kb.addKeys({ left: 'LEFT', right: 'RIGHT', up: 'UP', a: 'A', d: 'D', w: 'W', space: 'SPACE', x: 'X', j: 'J', k: 'K', shift: 'SHIFT', p: 'P', esc: 'ESC' }) as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = kb.addKeys({ left: 'LEFT', right: 'RIGHT', up: 'UP', down: 'DOWN', s: 'S', a: 'A', d: 'D', w: 'W', space: 'SPACE', x: 'X', j: 'J', k: 'K', shift: 'SHIFT', p: 'P', esc: 'ESC' }) as Record<string, Phaser.Input.Keyboard.Key>;
     scene.input.addPointer(3);
     scene.input.on('pointerdown', this.onDown, this);
     scene.input.on('pointermove', this.onMove, this);
@@ -80,7 +83,7 @@ export class InputSystem {
   }
 
   private onUp(p: Phaser.Input.Pointer) {
-    if (p.id === this.stickPointerId) { this.stickPointerId = -1; this.stickActive = false; this.touchAxis = 0; }
+    if (p.id === this.stickPointerId) { this.stickPointerId = -1; this.stickActive = false; this.touchAxis = 0; this.touchAxisY = 0; }
     if (p.id === this.jumpPointerId) this.jumpPointerId = -1;
   }
 
@@ -89,8 +92,10 @@ export class InputSystem {
     const d = p.x - this.stickOrigin.x;
     if (Math.abs(d) > R) this.stickOrigin.x = p.x - Math.sign(d) * R;      // stick follows a drifting thumb
     const dx = Phaser.Math.Clamp((p.x - this.stickOrigin.x) / R, -1, 1);
-    this.stickKnob.set(this.stickOrigin.x + dx * R, this.stickOrigin.y);
+    const dy = Phaser.Math.Clamp((p.y - this.stickOrigin.y) / R, -1, 1);
+    this.stickKnob.set(this.stickOrigin.x + dx * R, this.stickOrigin.y + dy * R * 0.6);
     this.touchAxis = Math.abs(dx) < T.STICK_DEADZONE ? 0 : dx;
+    this.touchAxisY = Math.abs(dy) < 0.35 ? 0 : dy;
   }
 
   /** Call once per frame before reading state. */
@@ -101,6 +106,8 @@ export class InputSystem {
     if (k.right.isDown || k.d.isDown) kx += 1;
     if (kx !== 0 && k.shift.isDown) kx *= 0.5;                                 // shift = walk on keyboard
     this.axis = kx !== 0 ? kx : this.touchAxis;
+    const ky = k.down.isDown || k.s.isDown ? 1 : 0;
+    this.axisY = ky !== 0 ? ky : this.touchAxisY;
 
     const held = k.space.isDown || k.up.isDown || k.w.isDown || this.jumpPointerId >= 0;
     this.jumpPressed = (held && !this.jumpWasHeld) || this.jumpQueued;
@@ -118,7 +125,7 @@ export class InputSystem {
 
   /** Drop any held touch (e.g. when pausing) so nothing sticks. */
   release() {
-    this.stickPointerId = -1; this.jumpPointerId = -1; this.stickActive = false; this.touchAxis = 0;
+    this.stickPointerId = -1; this.jumpPointerId = -1; this.stickActive = false; this.touchAxis = 0; this.touchAxisY = 0;
     this.jumpQueued = false; this.attackQueued = false; this.pauseQueued = false;
   }
 }

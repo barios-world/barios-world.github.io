@@ -14,8 +14,8 @@ Alles wird lokal gespeichert (Fortschritt, Karten, Shop, Einstellungen). `?debug
 
 ## Steuerung
 
-- **iPhone:** linke Hälfte = schwebender Joystick (erscheint unter dem Daumen), rechts unten = **SPRUNG** (halten = höher), darüber = **WURF** der aktiven Form / KHUSRA MUND bei vollem Meter. Oben Mitte = Pause.
-- **Mac:** Pfeile/WASD, Leertaste = Sprung, X/J/K = Wurf, Shift = gehen, P/ESC = Pause.
+- **iPhone:** linke Hälfte = schwebender Joystick (erscheint unter dem Daumen), rechts unten = **SPRUNG** (halten = höher), darüber = **WURF** der aktiven Form / KHUSRA MUND bei vollem Meter. **STAMPF:** in der Luft Stick nach unten + Wurf – Bario knallt runter, die Druckwelle erledigt Gegner, zerbricht Ziegel und öffnet Blöcke. Oben Mitte = Pause.
+- **Mac:** Pfeile/WASD, Leertaste = Sprung, X/J/K = Wurf, Runter/S + Wurf in der Luft = Stampf, Shift = gehen, P/ESC = Pause.
 - Optionen: Sound, Musik, Linkshänder, große Knöpfe, Blitze reduzieren, Assist-Modus (5 Herzen, langsamere Mobs + Boss, unendlich Leben).
 
 ## Season 1
@@ -29,6 +29,8 @@ Alles wird lokal gespeichert (Fortschritt, Karten, Shop, Einstellungen). `?debug
 | Der Thronsaal | Final Boss | **Der Direktor** – 3 Phasen (Brille, Kaffee Regen, Kristalle, Teleport) |
 
 Sechs Formen (Sport-Suchti, Boxer, Skater, Sprayer, DJ, Rocker), vier Specials, KHUSRA MUND, Barios Shop mit fünf Level-Ups, Boss Rush (nach dem ersten Sieg über den Direktor – der Gürtel zählt die Zeit).
+
+**Stimmen:** alles synthetisiert (Silben-Synth im WebAudio, keine Dateien). Bario bedankt sich fabulös für jede Karte („¡Gracias!", „¡Fabuloso!", „¡Qué rico!") und ruft „Khusra!", die Meistersager brabbeln Baby-Laute („Gaga?", „Wääh!", „Meithhter!"), der Direktor grollt tief wie Bowser („Ruhe im Spiel, Chaos im Kopf", „Mehr Zucker!", „Ha ha ha!"). Alle Sprüche stehen in `src/systems/Audio.ts` (`PHRASES`).
 
 ## Entwickeln
 

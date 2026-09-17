@@ -39,7 +39,7 @@ export class TitleScene extends Phaser.Scene {
     const firstOpen = LEVELS.find((l) => l.world > 0 && !save.progress(l.key).cleared && save.isUnlocked(l.key, LEVELS[0].key)) ?? LEVELS[0];
     const anyCleared = LEVELS.some((l) => save.progress(l.key).cleared);
     let y = h * 0.47;
-    button(this, cx, y, bw, bh, anyCleared ? 'WEITERSPIELEN' : 'SPIELEN', () => this.startLevel(firstOpen.key), { primary: true, u });
+    button(this, cx, y, bw, bh, anyCleared ? 'WEITERSPIELEN' : 'SPIELEN', () => { audio.say('bario', 'hola'); this.startLevel(firstOpen.key); }, { primary: true, u });
     y += bh + 8 * u;
     button(this, cx, y, bw, bh, 'WEGWEISER', () => this.scene.start('levels'), { u });
     y += bh + 8 * u;
@@ -55,7 +55,7 @@ export class TitleScene extends Phaser.Scene {
     this.add.text(w * 0.12, h * 0.55, 'Life is\nCambio ♥', HAND(u, 14)).setOrigin(0.5).setAngle(-6).setDepth(2).setAlign('center');
     this.add.text(w * 0.86, h * 0.5, 'Same shit\ndifferent level ♥', HAND(u, 13, '#A79C90')).setOrigin(0.5).setAngle(4).setDepth(2).setAlign('center');
     this.add.text(w - 8 * u, h - 6 * u, `Karten gesamt: ${save.data.totalCards}`, PX(u, 5, '#6E635B')).setOrigin(1, 1).setDepth(2);
-    this.add.text(8 * u, h - 6 * u, 'v0.7.1  M7', PX(u, 5, '#6E635B')).setOrigin(0, 1).setDepth(2);
+    this.add.text(8 * u, h - 6 * u, 'v0.8  M8', PX(u, 5, '#6E635B')).setOrigin(0, 1).setDepth(2);
     if (save.data.bossCleared) this.add.text(w / 2, h * 0.395, 'LEGENDE ♥  Season 1 geschafft', HAND(u, 12, '#FFC24B')).setOrigin(0.5).setDepth(2);
   }
 

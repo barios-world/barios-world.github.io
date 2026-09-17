@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { T } from '../config/Tuning';
+import { audio } from '../systems/Audio';
 
 /** Hot coffee puddle on the ground: touching it hurts (World 2). */
 export class Puddle extends Phaser.Physics.Arcade.Image {
@@ -58,20 +59,30 @@ export class BallSpawner {
 export class CardPlatform extends Phaser.Physics.Arcade.Image {
   declare body: Phaser.Physics.Arcade.StaticBody;
   solidPhase = true;
+  /** Same red card the whole time: solid = opaque, open = ghost. Blinks + ticks before it flips so the state is never a guess. */
   constructor(scene: Phaser.Scene, x: number, y: number, phase = 0) {
     super(scene, x, y, 'spr', 'plat_card_0');
     scene.add.existing(this);
     scene.physics.add.existing(this, true);
     this.setDepth(3);
     this.body.setSize(60, 10).setOffset(2, 0);
+    const warn = () => {
+      if (!this.active) return;
+      scene.tweens.add({ targets: this, alpha: 0.45, duration: 100, yoyo: true, repeat: 2, onComplete: () => { if (this.active && this.solidPhase) this.setAlpha(1); } });
+      [0, 200, 400].forEach((d) => scene.time.delayedCall(d, () => { if (this.active && this.solidPhase) audio.tick(); }));
+    };
     const loop = () => {
-      // 1.8s solid -> flip (0.35s) -> 0.9s open -> flip back
-      scene.time.delayedCall(1800, () => {
+      scene.time.delayedCall(T.CARD_SOLID_MS - 600, warn);
+      scene.time.delayedCall(T.CARD_SOLID_MS, () => {
         if (!this.active) return;
-        scene.tweens.add({ targets: this, scaleX: 0, duration: 170, yoyo: true, onYoyo: () => { this.setTexture('spr', 'plat_card_back_0'); this.solidPhase = false; this.body.enable = false; },
-          onComplete: () => scene.time.delayedCall(900, () => {
+        audio.flip();
+        scene.tweens.add({ targets: this, scaleX: 0, duration: 170, yoyo: true,
+          onYoyo: () => { this.solidPhase = false; this.body.enable = false; this.setAlpha(0.22); },
+          onComplete: () => scene.time.delayedCall(T.CARD_OPEN_MS, () => {
             if (!this.active) return;
-            scene.tweens.add({ targets: this, scaleX: 0, duration: 170, yoyo: true, onYoyo: () => { this.setTexture('spr', 'plat_card_0'); this.solidPhase = true; this.body.enable = true; }, onComplete: loop });
+            audio.flip();
+            scene.tweens.add({ targets: this, scaleX: 0, duration: 170, yoyo: true,
+              onYoyo: () => { this.solidPhase = true; this.body.enable = true; this.setAlpha(1); }, onComplete: loop });
           }) });
       });
     };

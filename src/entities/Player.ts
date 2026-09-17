@@ -33,6 +33,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   noCooldown = false;
   /** permanent multiplier from the shop */
   upgradeSpeed = 1;
+  /** Stampf: slamming down after stick-down + attack in the air */
+  pounding = false;
+  onPound?: (x: number, y: number) => void;
   private blinkTween?: Phaser.Tweens.Tween;
   private scaleTween?: Phaser.Tweens.Tween;
   onLand?: (x: number, y: number, speed: number) => void;
@@ -63,8 +66,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.coyote = 0;
     this.buffer = 0;
     this.controlLock = 0;
+    this.pounding = false;
     this.stopBlink();
-    this.gfx.setScale(1, 1).setAlpha(1);
+    this.gfx.setScale(1, 1).setAlpha(1).setAngle(0);
     this.syncGfx();
   }
 
@@ -88,6 +92,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.controlLock = 220;
     this.body.setVelocity(fromDir * T.KNOCKBACK_X, -T.KNOCKBACK_Y);
     this.startBlink();
+    audio.say('bario', 'ay');
     if (this.form !== 'base') {
       const lost = this.def.name;
       this.setForm('base');
@@ -152,9 +157,23 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
     b.setVelocityX(vx);
 
+    // --- Stampf: in the air, stick down + attack -> slam straight down, shockwave on landing (see GameScene.poundImpact)
+    let poundStarted = false;
+    if (!grounded && !this.pounding && inp.attackPressed && inp.axisY > 0.5 && !locked) {
+      this.pounding = true; poundStarted = true;
+      b.setVelocity(0, T.POUND_V);
+      this.attackCooldown = 200;
+      audio.pound();
+    }
+    if (this.pounding) {
+      b.setVelocityX(0);
+      this.gfx.angle += 26 * (this.facing || 1);
+      if (grounded) { this.pounding = false; this.gfx.setAngle(0); this.onPound?.(this.x, b.bottom); }
+    }
+
     // --- attack
     const ultReady = ((this.scene.registry.get('khusra') as number) || 0) >= 100;
-    if (inp.attackPressed && !locked && (this.attackCooldown <= 0 || ultReady)) {
+    if (inp.attackPressed && !locked && !poundStarted && !this.pounding && (this.attackCooldown <= 0 || ultReady)) {
       const cd = this.onAttack?.(this.form, this.x + this.facing * 18, b.center.y - 6, this.facing) ?? 0;
       if (cd > 0) {
         this.attackCooldown = this.noCooldown ? Math.min(cd, 90) : cd;
