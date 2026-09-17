@@ -30,6 +30,29 @@ def assemble(include_scenes=True):
     for k in FORMS:
         add('formwalk_' + k, [on_canvas(figure_side(FORMS[k], f)) for f in WALK])
         add('formidle_' + k, P.idle_frames(FORMS[k]))
+        add('formjump_' + k, on_canvas(figure_side(FORMS[k], JUMP, lean=1, mouth='open')))
+    # special pickups (recolored props) + form pickup glow ring
+    def recolor(g, m):
+        h = g.copy()
+        for a, b in m.items():
+            h.replace(a, b)
+        return h
+    gold = G(24, 24); P.prop_cup(gold, 6, 8, steam=True); add('pk_kaffeepower', recolor(gold, {'O': 'L', 'o': 'G', 'J': 'g', 'j': 'G'}))
+    add('pk_buecher', I.buch())
+    fan = G(28, 24)
+    for i, (x, col) in enumerate(((2, 'R'), (9, '1'), (16, 'A'), (22, '?'))):
+        P.prop_card(fan, x, 6 + (i % 2) * 2, col)
+    add('pk_cambio', fan)
+    ring = G(30, 30)
+    P.ring(ring, 15, 15, 14, 14, '&', thick=2.0); P.ring(ring, 15, 15, 10, 10, '%', thick=1.4)
+    add('fx_ring', ring)
+    chord = G(48, 48)
+    P.ring(chord, 24, 24, 22, 22, 'R', thick=2.2); P.ring(chord, 24, 24, 16, 16, 'V', thick=1.6); P.ring(chord, 24, 24, 9, 9, '?', thick=1.4)
+    add('fx_chord', chord)
+    spray = G(40, 24)
+    for i, (dx, dy) in enumerate(((2, 0), (5, -2), (5, 2), (9, -4), (9, 0), (9, 4), (13, -6), (13, -2), (13, 2), (13, 6), (18, -8), (18, -3), (18, 3), (18, 8), (23, -9), (23, 0), (23, 9), (28, -6), (28, 6), (33, -3), (33, 3), (37, 0))):
+        spray.set(2 + dx, 12 + dy, '&' if i < 10 else ('%' if i < 18 else '*'))
+    add('fx_spray', spray)
 
     # ---------------- Meistersager
     add('meister_idle', P.idle_frames(MEISTER, bubble=True))

@@ -27,7 +27,9 @@ for (const f of files) {
   const w = Math.max(...rows.map((r) => r.length));
   const grid = rows.map((r) => r.padEnd(w, '.'));
   const at = (x: number, y: number) => (x < 0 || x >= w || y < 0 || y >= h ? '.' : grid[y][x]);
-  const solid = (x: number, y: number) => at(x, y) === '#' || at(x, y) === '=';
+  const solid = (x: number, y: number) => at(x, y) === '#' || at(x, y) === '=' || at(x, y) === 'B';
+  // block contents by symbol: ? card, ! kaffee, forms H/G/K/Y/D/R, specials 1/2/3
+  const BLOCKS: Record<string, string> = { '?': 'card', '!': 'kaffee', H: 'sport', G: 'boxer', K: 'skater', Y: 'sprayer', D: 'dj', R: 'rocker', '1': 'kaffeepower', '2': 'buecher', '3': 'cambio' };
 
   const ground: number[] = new Array(w * h).fill(0);
   const back: number[] = new Array(w * h).fill(0);
@@ -41,11 +43,13 @@ for (const f of files) {
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const ch = at(x, y);
+      if (ch === 'B') { ground[y * w + x] = 19; continue; }   // brick (gid 19): breakable by Sport/Rocker
       if (solid(x, y)) {
         const top = !solid(x, y - 1), bottom = !solid(x, y + 1), left = !solid(x - 1, y), right = !solid(x + 1, y);
         ground[y * w + x] = GID(top, bottom, left, right);
         continue;
       }
+      if (BLOCKS[ch]) { obj('block', x * TS, y * TS, { width: TS, height: TS, point: false, properties: [{ name: 'contents', type: 'string', value: BLOCKS[ch] }] }); continue; }
       const [cx, cy] = center(x, y);
       switch (ch) {
         case 'S': obj('spawn', cx, cy); break;
@@ -54,8 +58,6 @@ for (const f of files) {
         case 'c': obj('card', cx, cy); break;
         case 'C': obj('royal', cx, cy); break;
         case 'm': obj('mob', cx, (y + 1) * TS); break;
-        case '?': obj('block', x * TS, y * TS, { width: TS, height: TS, point: false, properties: [{ name: 'contents', type: 'string', value: 'card' }] }); break;
-        case '!': obj('block', x * TS, y * TS, { width: TS, height: TS, point: false, properties: [{ name: 'contents', type: 'string', value: 'kaffee' }] }); break;
         case 'P': obj('pipe', x * TS, (y + 1) * TS, { width: TS, height: TS * 2, point: false }); break;
         case 's': obj('sign', cx, (y + 1) * TS); break;
         case 'b': obj('bush', cx, (y + 1) * TS); break;

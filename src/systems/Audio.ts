@@ -138,8 +138,27 @@ class Synth {
   private startScheduler() {
     if (!this.ctx || !this.track) return;
     this.nextTime = this.ctx.currentTime + 0.1;
+    this.anchor = this.nextTime;
     this.timer = window.setInterval(() => this.schedule(), 90);
   }
+
+  private anchor = 0;
+
+  /** Seconds to the nearest eighth-note beat of the running track (Infinity without music). */
+  beatOffset() {
+    if (!this.ctx || !this.track || !this.timer) return Infinity;
+    const eighth = 60 / this.track.bpm / 2;
+    const phase = ((this.ctx.currentTime - this.anchor) % eighth + eighth) % eighth;
+    return Math.min(phase, eighth - phase);
+  }
+
+  chord() { this.sfx(() => { [110, 165, 220, 330].forEach((f) => this.tone('sawtooth', f, f * 0.98, 0.55, 0.22)); this.noise(0.1, 0.2, 800); }); }
+  punch() { this.sfx(() => { this.tone('square', 200, 120, 0.09, 0.4); this.noise(0.05, 0.2, 500); }); }
+  spray() { this.sfx(() => this.noise(0.25, 0.22, 2500)); }
+  djwave(perfect: boolean) { this.sfx(() => this.tone('sine', perfect ? 660 : 440, perfect ? 1320 : 660, 0.18, 0.4)); }
+  khusra() { this.sfx(() => { this.tone('sawtooth', 120, 480, 0.6, 0.5); this.tone('square', 240, 960, 0.5, 0.3, 0.05); this.noise(0.5, 0.35, 400); }); }
+  special() { this.sfx(() => [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => this.tone('triangle', f, f, 0.12, 0.35, i * 0.05))); }
+  meterFull() { this.sfx(() => [880, 1109, 1319].forEach((f, i) => this.tone('square', f, f, 0.1, 0.3, i * 0.07))); }
 
   private schedule() {
     if (!this.ctx || !this.track || !this.musicBus) return;

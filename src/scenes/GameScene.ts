@@ -1,14 +1,14 @@
 import Phaser from 'phaser';
 import { T, GAME_H } from '../config/Tuning';
 import { InputSystem } from '../systems/Input';
-import { audio } from '../systems/Audio';
+import { audio, TRACK_BOULEVARD } from '../systems/Audio';
+import { save } from '../systems/Save';
 import { Player } from '../entities/Player';
 import { Mob } from '../entities/Mob';
 import { Block } from '../entities/Block';
-import { Cup, Wave } from '../entities/Projectiles';
+import { Cup, Wave, HomingCard } from '../entities/Projectiles';
 import { LEVELS, nextLevel } from '../data/levels';
-import { save } from '../systems/Save';
-import { TRACK_BOULEVARD } from '../systems/Audio';
+import { FORMS, SPECIALS, isForm, isSpecial, type Form, type Special } from '../data/forms';
 
 type Obj = Phaser.Types.Tilemaps.TiledObject;
 type Overlay = { kind: 'result' | 'gameover'; lines: string[]; hint: string } | null;
@@ -23,13 +23,15 @@ export class GameScene extends Phaser.Scene {
   solids!: Phaser.Physics.Arcade.StaticGroup;
   blocks: Block[] = [];
   mobs: Mob[] = [];
-  mobGroup!: Phaser.GameObjects.Group;
-  cups!: Phaser.GameObjects.Group;
-  waves!: Phaser.GameObjects.Group;
+  mobGroup!: Phaser.Physics.Arcade.Group;
+  cups!: Phaser.Physics.Arcade.Group;
+  homing!: Phaser.Physics.Arcade.Group;
+  waves!: Phaser.Physics.Arcade.Group;
   pickups!: Phaser.Physics.Arcade.Group;
   flag?: Phaser.Physics.Arcade.Image;
   dust!: Phaser.GameObjects.Particles.ParticleEmitter;
   sparks!: Phaser.GameObjects.Particles.ParticleEmitter;
+  paint!: Phaser.GameObjects.Particles.ParticleEmitter;
   levelKey = LEVELS[0].key;
   spawn = new Phaser.Math.Vector2(64, 200);
   respawnPoint = new Phaser.Math.Vector2(64, 200);
@@ -42,6 +44,12 @@ export class GameScene extends Phaser.Scene {
   comboUntil = 0;
   tookDamage = false;
   totalCards = 0;
+  punchCombo = 0;
+  punchComboUntil = 0;
+  special: Special | null = null;
+  specialUntil = 0;
+  worldScale = 1;
+  khusra = 0;
 
   constructor() { super('game'); }
 
@@ -54,8 +62,12 @@ export class GameScene extends Phaser.Scene {
     this.overlay = null;
     this.tookDamage = false;
     this.combo = 0;
+    this.punchCombo = 0;
+    this.special = null;
+    this.worldScale = 1;
     this.blocks = [];
     this.mobs = [];
+    this.totalCards = 0;
     this.inputSys = new InputSystem(this);
 
     // --- map
@@ -73,14 +85,15 @@ export class GameScene extends Phaser.Scene {
     for (let x = 0; x < W * 0.85 + 200; x += 118) this.add.image(x + (x % 3) * 9, groundTop + 2, 'spr', 'hill_0').setOrigin(0.5, 1).setScrollFactor(0.55, 0.95).setDepth(-6).setAlpha(0.8);
     for (let i = 0; i < Math.ceil(W / 240); i++) this.add.image(i * 240 + (i % 3) * 40, 34 + (i % 4) * 24, 'spr', 'cloud_0').setScrollFactor(0.4, 0.9).setDepth(-5).setAlpha(0.9);
 
-    // --- groups
+    // --- groups. Dynamic groups get their `defaults` cleared: otherwise add() resets velocity/gravity of
+    // pre-configured children. Plain groups are no alternative - the Arcade RTree lookup skips them.
     this.cards = this.physics.add.staticGroup();
     this.checkpoints = this.physics.add.staticGroup();
     this.solids = this.physics.add.staticGroup();
-    // plain groups: physics groups would reset velocity/gravity of children on add()
-    this.mobGroup = this.add.group();
-    this.cups = this.add.group();
-    this.waves = this.add.group();
+    this.mobGroup = this.dynGroup();
+    this.cups = this.dynGroup();
+    this.homing = this.dynGroup();
+    this.waves = this.dynGroup();
     this.pickups = this.physics.add.group();
 
     // --- objects
@@ -124,7 +137,7 @@ export class GameScene extends Phaser.Scene {
         case 'pipe': {
           const p = this.solids.create(x + 16, y, 'spr', 'pipe_big_0') as Phaser.Physics.Arcade.Sprite;
           p.setOrigin(0.5, 1).setDepth(2);
-          (p.body as Phaser.Physics.Arcade.StaticBody).setSize(32, 64).setOffset(0, -64 + 64);
+          (p.body as Phaser.Physics.Arcade.StaticBody).setSize(32, 64).setOffset(0, 0);
           p.refreshBody();
           break;
         }
@@ -145,19 +158,24 @@ export class GameScene extends Phaser.Scene {
       frame: 'fx_spark_0', speed: { min: 60, max: 160 }, angle: { min: 0, max: 360 }, lifespan: { min: 200, max: 420 },
       gravityY: 400, scale: { start: 1, end: 0 }, quantity: 8, emitting: false,
     }).setDepth(12);
+    this.paint = this.add.particles(0, 0, 'spr', {
+      frame: 'fx_dust_0', speed: { min: 40, max: 120 }, lifespan: { min: 250, max: 500 }, gravityY: 200,
+      scale: { start: 1.2, end: 0.4 }, alpha: { start: 1, end: 0 }, tint: [0xff4fa3, 0xf4c6d8, 0xffe7f2], quantity: 10, emitting: false,
+    }).setDepth(12);
 
     // --- player
     this.player = new Player(this, this.spawn.x, this.spawn.y);
     this.player.spawnAt(this.spawn.x, this.spawn.y + 16);
-    this.player.setForm((this.registry.get('form') as 'base' | 'kaffee') ?? 'base');
+    const f = this.registry.get('form') as string;
+    this.player.setForm(isForm(f) ? f : 'base');
     this.player.onLand = (x, y, speed) => this.dust.emitParticleAt(x, y, speed > 8 ? 8 : 4);
     this.player.onJump = (x, y) => this.dust.emitParticleAt(x, y, 4);
-    this.player.onThrow = (x, y, dir) => this.cups.add(new Cup(this, x, y, dir));
+    this.player.onAttack = (form, x, y, dir) => this.attack(form, x, y, dir);
 
     // --- mobs
     for (const [x, y] of mobDefs) {
       const m = new Mob(this, x, y, this.ground, save.settings.assist ? 0.7 : 1);
-      m.onShout = (sx, sy, dir) => this.waves.add(new Wave(this, sx, sy, dir));
+      m.onShout = (sx, sy, dir) => this.waves.add(new Wave(this, sx, sy, dir, 'mob'));
       this.mobs.push(m);
       this.mobGroup.add(m);
     }
@@ -174,7 +192,10 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.player, this.mobGroup, (_p, m) => this.playerVsMob(m as Mob));
     this.physics.add.overlap(this.player, this.waves, (_p, w) => this.playerVsWave(w as Wave));
     this.physics.add.overlap(this.player, this.pickups, (_p, k) => this.collectPickup(k as Phaser.Physics.Arcade.Sprite));
-    this.physics.add.overlap(this.cups, this.mobGroup, (c, m) => this.cupVsMob(c as Cup, m as Mob));
+    this.physics.add.overlap(this.cups, this.mobGroup, (c, m) => this.projectileVsMob(c as Phaser.Physics.Arcade.Sprite, m as Mob));
+    this.physics.add.overlap(this.homing, this.mobGroup, (c, m) => this.projectileVsMob(c as Phaser.Physics.Arcade.Sprite, m as Mob));
+    this.physics.add.overlap(this.waves, this.mobGroup, (w, m) => this.waveVsMob(w as Wave, m as Mob));
+    this.physics.add.overlap(this.mobGroup, this.mobGroup, (a, b) => this.mobVsMob(a as Mob, b as Mob));
     this.physics.add.collider(this.cups, this.ground, (c) => this.breakCup(c as Cup));
     this.physics.add.collider(this.cups, this.solids, (c) => this.breakCup(c as Cup));
     if (this.flag) this.physics.add.overlap(this.player, this.flag, () => this.finish());
@@ -194,6 +215,9 @@ export class GameScene extends Phaser.Scene {
     this.registry.set('maxHearts', maxHearts);
     this.registry.set('cards', 0);
     this.registry.set('royals', 0);
+    this.registry.set('special', '');
+    this.khusra = (this.registry.get('khusra') as number) || 0;
+    this.registry.set('khusra', this.khusra);
     if (!this.registry.has('lives')) this.registry.set('lives', 3);
     if (!this.registry.has('hearts') || this.registry.get('hearts') <= 0 || this.registry.get('hearts') > maxHearts) this.registry.set('hearts', maxHearts);
     this.startTime = this.time.now;
@@ -206,6 +230,13 @@ export class GameScene extends Phaser.Scene {
     this.input.on('pointerdown', this.onTapOverlay, this);
     this.input.keyboard?.on('keydown-SPACE', this.onTapOverlay, this);
     this.input.keyboard?.on('keydown-ENTER', this.onTapOverlay, this);
+    this.updateAura();
+  }
+
+  private dynGroup() {
+    const g = this.physics.add.group();
+    (g as unknown as { defaults: object }).defaults = {};
+    return g;
   }
 
   private onHidden() {
@@ -233,7 +264,7 @@ export class GameScene extends Phaser.Scene {
     cam.setDeadzone(T.CAM_DEADZONE_W, T.CAM_DEADZONE_H);
   }
 
-  // ------------------------------------------------------------ interactions
+  // ------------------------------------------------------------ blocks & pickups
   private onSolid(s: Phaser.Physics.Arcade.Image) {
     if (s instanceof Block && this.player.body.touching.up && this.player.body.velocity.y <= 0) {
       s.bump();
@@ -242,40 +273,227 @@ export class GameScene extends Phaser.Scene {
   }
 
   spawnFromBlock(blk: Block, what: string) {
-    if (what === 'kaffee') {
-      const k = this.pickups.create(blk.x, blk.y - 8, 'spr', 'it_kaffee_0') as Phaser.Physics.Arcade.Sprite;
-      k.setDepth(1).setData('kind', 'kaffee');
-      (k.body as Phaser.Physics.Arcade.Body).setAllowGravity(false).setSize(20, 20).setOffset(2, 2);
-      this.tweens.add({ targets: k, y: blk.y - 40, duration: 380, ease: 'Quad.out', onComplete: () => {
-        k.setDepth(6); (k.body as Phaser.Physics.Arcade.Body).setAllowGravity(true).setGravityY(T.GRAVITY * 0.5).setVelocityX(60).setBounce(0.3);
-      } });
-    } else {
-      // card pops out and is banked automatically (Mario coin style)
-      const n = 1;
-      for (let i = 0; i < n; i++) {
-        const c = this.add.image(blk.x, blk.y - 16, 'spr', 'it_karte_0').setDepth(12);
-        this.tweens.add({ targets: c, y: blk.y - 70, duration: 260, ease: 'Quad.out', yoyo: true, onComplete: () => c.destroy() });
-      }
+    if (what === 'card') {
+      const c = this.add.image(blk.x, blk.y - 16, 'spr', 'it_karte_0').setDepth(12);
+      this.tweens.add({ targets: c, y: blk.y - 70, duration: 260, ease: 'Quad.out', yoyo: true, onComplete: () => c.destroy() });
       this.bankCards(1, blk.x, blk.y - 40, false);
+      return;
     }
+    const icon = isForm(what) ? FORMS[what].icon : isSpecial(what) ? SPECIALS[what].icon : 'it_kaffee_0';
+    const k = this.pickups.create(blk.x, blk.y - 8, 'spr', icon) as Phaser.Physics.Arcade.Sprite;
+    k.setDepth(1).setData('kind', what);
+    (k.body as Phaser.Physics.Arcade.Body).setAllowGravity(false).setSize(20, 20).setOffset((k.width - 20) / 2, (k.height - 20) / 2);
+    this.tweens.add({ targets: k, y: blk.y - 40, duration: 380, ease: 'Quad.out', onComplete: () => {
+      if (!k.active || !k.body) return;                 // already collected while rising
+      k.setDepth(6);
+      (k.body as Phaser.Physics.Arcade.Body).setAllowGravity(true).setGravityY(T.GRAVITY * 0.5).setVelocityX(60).setBounce(0.3);
+    } });
   }
 
   collectPickup(k: Phaser.Physics.Arcade.Sprite) {
-    if (k.getData('kind') === 'kaffee') {
-      this.player.setForm('kaffee');
-      audio.powerup();
-      this.events.emit('msg', 'KAFFEE POWER!  WURF-KNOPF = TASSE', 1500);
-      this.sparks.emitParticleAt(k.x, k.y, 10);
-    }
+    const kind = k.getData('kind') as string;
+    this.sparks.emitParticleAt(k.x, k.y, 10);
     k.destroy();
+    if (isForm(kind)) {
+      this.player.setForm(kind);
+      audio.powerup();
+      this.events.emit('msg', FORMS[kind].msg, 1600);
+    } else if (isSpecial(kind)) {
+      this.startSpecial(kind);
+    }
   }
 
+  // ------------------------------------------------------------ specials
+  startSpecial(kind: Special) {
+    this.special = kind;
+    this.specialUntil = this.time.now + SPECIALS[kind].ms;
+    this.registry.set('special', kind);
+    audio.special();
+    this.events.emit('msg', SPECIALS[kind].msg, 1600);
+    this.player.boostSpeed = kind === 'kaffeepower' ? 1.3 : 1;
+    this.player.boostJump = kind === 'kaffeepower' ? 1.15 : 1;
+    this.player.noCooldown = kind === 'kaffeepower';
+    this.worldScale = kind === 'buecher' ? 0.45 : 1;
+    if (kind === 'buecher') this.waves.getChildren().forEach((w) => (w as Wave).body.velocity.scale(0.45));
+    this.updateAura();
+  }
+
+  endSpecial() {
+    if (this.special === 'buecher') this.waves.getChildren().forEach((w) => (w as Wave).body.velocity.scale(1 / 0.45));
+    this.special = null;
+    this.registry.set('special', '');
+    this.player.boostSpeed = 1; this.player.boostJump = 1; this.player.noCooldown = false;
+    this.worldScale = 1;
+    this.updateAura();
+  }
+
+  private updateAura() {
+    if (this.special === 'kaffeepower') this.player.setAura(0xffe08a);
+    else if (this.special === 'cambio') this.player.setAura(0xf4c6d8);
+    else if (this.special === 'buecher') this.player.setAura(0xa9d8f0);
+    else if (this.khusra >= 100) this.player.setAura(0xff4fa3);
+    else this.player.setAura(null);
+  }
+
+  addKhusra(v: number) {
+    const was = this.khusra;
+    this.khusra = Math.min(100, this.khusra + v);
+    this.registry.set('khusra', this.khusra);
+    if (was < 100 && this.khusra >= 100) { audio.meterFull(); this.events.emit('msg', 'KHUSRA MUND BEREIT!', 1200); this.updateAura(); }
+  }
+
+  // ------------------------------------------------------------ attacks
+  /** Returns the cooldown in ms when an attack happened, 0 when nothing fired. */
+  attack(form: Form, x: number, y: number, dir: number): number {
+    // Ultimate first: a full meter fires KHUSRA MUND from any form
+    if (this.khusra >= 100) { this.khusraMund(); return 600; }
+    if (this.special === 'cambio') {
+      audio.throw();
+      for (let i = -2; i <= 2; i++) {
+        const c = new HomingCard(this, x, y - 4, dir, i * 0.5);
+        c.target = this.nearestMob(x, y, 320);
+        this.homing.add(c);
+      }
+      return 380;
+    }
+    const cd = FORMS[form].cooldown;
+    switch (FORMS[form].attack) {
+      case 'cup': audio.throw(); this.cups.add(new Cup(this, x, y, dir)); return cd;
+      case 'punch': this.punch(dir, false); return cd;
+      case 'combo': this.punch(dir, true); return cd;
+      case 'spray': this.spray(dir); return cd;
+      case 'wave': this.djWave(x, y, dir); return cd;
+      case 'chord': this.chord(); return cd;
+      default: return 0;
+    }
+  }
+
+  private nearestMob(x: number, y: number, maxDist: number) {
+    let best: Mob | undefined, bd = maxDist;
+    for (const m of this.mobs) {
+      if (!m.alive) continue;
+      const d = Phaser.Math.Distance.Between(x, y, m.x, m.y);
+      if (d < bd) { bd = d; best = m; }
+    }
+    return best;
+  }
+
+  private mobsInFront(dir: number, range: number, dy = 56) {
+    const p = this.player.body;
+    return this.mobs.filter((m) => m.alive && !m.flung && Math.abs(m.y - p.center.y) < dy &&
+      (dir > 0 ? m.body.left >= p.center.x - 6 && m.body.left <= p.right + range : m.body.right <= p.center.x + 6 && m.body.right >= p.left - range));
+  }
+
+  private punch(dir: number, combo: boolean) {
+    const now = this.time.now;
+    audio.punch();
+    const pb = this.player.body;
+    const px = pb.center.x + dir * (T.PUNCH_RANGE * 0.6), py = pb.center.y;
+    this.dust.emitParticleAt(px, py, 3);
+    // bricks: Sport-Suchti smashes them (probe two reaches, two heights)
+    if (!combo) {
+      const seen = new Set<Phaser.Tilemaps.Tile>();
+      for (const reach of [pb.halfWidth + 6, pb.halfWidth + 24]) {
+        for (const dy of [-12, 10]) {
+          const tile = this.ground.getTileAtWorldXY(pb.center.x + dir * reach, py + dy);
+          if (tile && tile.index === 19 && !seen.has(tile)) { seen.add(tile); this.breakBrick(tile); }
+        }
+      }
+    }
+    for (const m of this.mobsInFront(dir, T.PUNCH_RANGE)) {
+      if (combo) {
+        this.punchCombo = now < this.punchComboUntil ? this.punchCombo + 1 : 1;
+        this.punchComboUntil = now + T.COMBO_WINDOW_PUNCH;
+        if (this.punchCombo >= 3) { this.punchCombo = 0; m.fling(dir); this.events.emit('msg', 'ABFLUG!', 600); }
+        else m.push(dir, 40, -60);
+        this.sparks.emitParticleAt(m.x, m.y - 30, 4);
+      } else {
+        m.kill(); this.addKhusra(T.KHUSRA_KILL); this.sparks.emitParticleAt(m.x, m.y - 30, 8);
+      }
+      this.hitstop();
+    }
+    // blocks in front
+    for (const b of this.blocks) {
+      if (Math.abs(b.y - py) < 40 && (dir > 0 ? b.x - px > -8 && b.x - px < T.PUNCH_RANGE : px - b.x > -8 && px - b.x < T.PUNCH_RANGE)) b.bump();
+    }
+  }
+
+  breakBrick(tile: Phaser.Tilemaps.Tile) {
+    this.ground.removeTileAt(tile.x, tile.y);
+    this.ground.setCollisionByExclusion([-1]);
+    this.dust.emitParticleAt(tile.getCenterX(), tile.getCenterY(), 10);
+    audio.bump();
+    this.cameras.main.shake(60, 0.004);
+  }
+
+  private spray(dir: number) {
+    audio.spray();
+    const p = this.player.body;
+    const s = this.add.image(p.center.x + dir * 22, p.center.y - 8, 'spr', 'fx_spray_0').setOrigin(0, 0.5).setDepth(11).setFlipX(dir < 0);
+    if (dir < 0) s.setOrigin(1, 0.5);
+    this.tweens.add({ targets: s, alpha: 0, scaleX: 1.3, duration: 320, onComplete: () => s.destroy() });
+    for (const m of this.mobsInFront(dir, T.SPRAY_RANGE, 44)) {
+      m.confuse(T.CONFUSE_MS);
+      this.paint.emitParticleAt(m.x, m.y - 30, 12);
+    }
+  }
+
+  private djWave(x: number, y: number, dir: number) {
+    const off = audio.beatOffset();
+    const perfect = off < T.DJ_BEAT_WINDOW;
+    audio.djwave(perfect);
+    if (perfect) this.events.emit('msg', 'PERFECT!', 400);
+    this.waves.add(new Wave(this, x, y - 4, dir, 'player', perfect ? 1.8 : 1));
+  }
+
+  private chord() {
+    audio.chord();
+    const p = this.player.body;
+    const ring = this.add.image(p.center.x, p.center.y, 'spr', 'fx_chord_0').setDepth(11).setScale(0.5);
+    this.tweens.add({ targets: ring, scale: T.CHORD_RADIUS / 22, alpha: 0, duration: 380, ease: 'Quad.out', onComplete: () => ring.destroy() });
+    this.cameras.main.shake(180, 0.008);
+    for (const m of this.mobs) {
+      if (m.alive && Phaser.Math.Distance.Between(p.center.x, p.center.y, m.x, m.y) < T.CHORD_RADIUS) { m.kill(); this.addKhusra(T.KHUSRA_KILL); this.sparks.emitParticleAt(m.x, m.y - 30, 8); }
+    }
+    for (const b of this.blocks) if (Phaser.Math.Distance.Between(p.center.x, p.center.y, b.x, b.y) < T.CHORD_RADIUS) b.bump();
+    const r = T.CHORD_RADIUS;
+    this.ground.getTilesWithinWorldXY(p.center.x - r, p.center.y - r, 2 * r, 2 * r).forEach((t) => { if (t.index === 19) this.breakBrick(t); });
+    this.hitstop();
+  }
+
+  khusraMund() {
+    this.khusra = 0;
+    this.registry.set('khusra', 0);
+    audio.khusra();
+    this.updateAura();
+    const p = this.player;
+    p.posUntil = this.time.now + 450;
+    const g = p.gfx;
+    g.anims.stop(); g.setTexture('spr', 'atk_mund_0').setOrigin(0.5, 58 / 64);
+    const cam = this.cameras.main;
+    cam.flash(300, 255, 79, 163);
+    cam.shake(400, 0.012);
+    for (let i = 0; i < 3; i++) {
+      const ring = this.add.image(p.body.center.x, p.body.center.y, 'spr', 'fx_ring_0').setDepth(13).setScale(0.6).setAlpha(0.9);
+      this.tweens.add({ targets: ring, scale: 6 + i * 2, alpha: 0, duration: 500 + i * 120, delay: i * 70, ease: 'Quad.out', onComplete: () => ring.destroy() });
+    }
+    const view = cam.worldView;
+    for (const m of this.mobs) {
+      if (m.alive && view.contains(m.x, m.y - 20)) { m.kill(); this.sparks.emitParticleAt(m.x, m.y - 30, 10); }
+    }
+    this.waves.getChildren().slice().forEach((w) => { if ((w as Wave).owner === 'mob') w.destroy(); });
+    this.events.emit('msg', 'KHUSRA MUND!', 900);
+    this.hitstop();
+  }
+
+  // ------------------------------------------------------------ cards
   bankCards(v: number, x: number, y: number, royal: boolean) {
     const now = this.time.now;
     this.combo = now < this.comboUntil ? this.combo + 1 : 1;
     this.comboUntil = now + T.COMBO_WINDOW;
     this.registry.inc('cards', v);
     this.registry.set('combo', this.combo);
+    this.addKhusra(T.KHUSRA_CARD + Math.min(this.combo, 6));
     if (royal) audio.royal(); else audio.card(this.combo);
     if (this.combo >= 3) {
       const t = this.add.text(x, y - 16, `x${this.combo}`, { fontFamily: '"Press Start 2P", monospace', fontSize: '8px', color: '#FF4FA3' }).setOrigin(0.5).setDepth(13);
@@ -302,29 +520,44 @@ export class GameScene extends Phaser.Scene {
     this.events.emit('msg', 'CHECKPOINT', 900);
   }
 
+  // ------------------------------------------------------------ combat resolution
   playerVsMob(m: Mob) {
-    if (!m.alive || this.player.dead || this.finished) return;
+    if (!m.alive || m.flung || this.player.dead || this.finished) return;
     const p = this.player.body;
     const stomp = p.velocity.y > 0 && p.bottom < m.body.top + 18;
     if (stomp) {
       m.kill();
+      this.addKhusra(T.KHUSRA_KILL);
       this.player.bounce();
       this.hitstop();
       this.dust.emitParticleAt(m.x, m.body.top, 6);
       this.registry.inc('stomps', 1);
-    } else {
+    } else if (m.state !== 'stunned') {
       this.damagePlayer(Math.sign(this.player.x - m.x) || 1);
     }
   }
 
   playerVsWave(w: Wave) {
-    if (this.player.dead || this.finished) return;
+    if (w.owner !== 'mob' || this.player.dead || this.finished) return;
     if (this.damagePlayer(w.dir)) w.destroy();
   }
 
-  cupVsMob(c: Cup, m: Mob) {
+  waveVsMob(w: Wave, m: Mob) {
+    if (w.owner !== 'player' || !m.alive || w.hit.has(m)) return;
+    w.hit.add(m);
+    m.push(w.dir, T.DJ_PUSH * w.strength);
+    this.sparks.emitParticleAt(m.x, m.y - 30, 4);
+  }
+
+  mobVsMob(a: Mob, b: Mob) {
+    if (a.flung && b.alive && !b.flung) { b.kill(); this.addKhusra(T.KHUSRA_KILL); this.sparks.emitParticleAt(b.x, b.y - 30, 8); }
+    else if (b.flung && a.alive && !a.flung) { a.kill(); this.addKhusra(T.KHUSRA_KILL); this.sparks.emitParticleAt(a.x, a.y - 30, 8); }
+  }
+
+  projectileVsMob(c: Phaser.Physics.Arcade.Sprite, m: Mob) {
     if (!m.alive) return;
     m.kill();
+    this.addKhusra(T.KHUSRA_KILL);
     this.sparks.emitParticleAt(c.x, c.y, 6);
     c.destroy();
     this.hitstop();
@@ -361,6 +594,7 @@ export class GameScene extends Phaser.Scene {
     this.player.body.setVelocity(0, -300);
     this.player.body.setAllowGravity(true);
     this.tweens.add({ targets: this.player.gfx, angle: 360, duration: 500 });
+    if (this.special) this.endSpecial();
     if (lives < 0) {
       this.time.delayedCall(600, () => this.gameOver());
     } else {
@@ -430,6 +664,7 @@ export class GameScene extends Phaser.Scene {
       this.registry.set('lives', 3);
       this.registry.set('hearts', 3);
       this.registry.set('form', 'base');
+      this.registry.set('khusra', 0);
       this.scene.restart({ level: this.levelKey });
     } else {
       this.registry.set('form', this.player.form);
@@ -455,10 +690,16 @@ export class GameScene extends Phaser.Scene {
     else this.player.syncGfx();
 
     const now = this.time.now;
-    for (const m of this.mobs) m.update(dt, this.player);
-    this.cups.getChildren().forEach((c) => { const cup = c as Cup; if (cup.expired(now) || cup.y > this.map.heightInPixels + 50) cup.destroy(); });
-    this.waves.getChildren().forEach((w) => { const wave = w as Wave; if (wave.expired(now)) wave.destroy(); });
+    if (this.special && now > this.specialUntil) this.endSpecial();
+    for (const m of this.mobs) {
+      m.update(dt, this.player, this.worldScale);
+      if (m.alive && m.y > this.map.heightInPixels + 60) { m.kill(); this.addKhusra(T.KHUSRA_KILL); }
+    }
+    this.cups.getChildren().slice().forEach((c) => { const cup = c as Cup; if (cup.expired(now) || cup.y > this.map.heightInPixels + 50) cup.destroy(); });
+    this.homing.getChildren().slice().forEach((c) => { const hc = c as HomingCard; hc.steer(dt); if (hc.expired(now)) hc.destroy(); });
+    this.waves.getChildren().slice().forEach((w) => { const wave = w as Wave; if (wave.expired(now)) wave.destroy(); });
     if (now > this.comboUntil && this.combo) { this.combo = 0; this.registry.set('combo', 0); }
+    if (now > this.punchComboUntil) this.punchCombo = 0;
 
     const cam = this.cameras.main;
     this.lookX = Phaser.Math.Linear(this.lookX, -this.player.facing * T.CAM_LOOKAHEAD, 0.08);
