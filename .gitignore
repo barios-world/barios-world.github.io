@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.DS_Store
+tools/sprites/__pycache__/
+tools/sprites/out/
+*.log

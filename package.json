@@ -1,0 +1,26 @@
+{
+  "name": "barios-world",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Barios World – Jump. Kaffee. Cambio. Repeat.",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host",
+    "assets": "python3 tools/sprites/atlas.py && python3 tools/sprites/tileset.py && python3 tools/sprites/icons.py && npm run levels",
+    "levels": "tsx scripts/ascii2tmj.ts",
+    "spielbuch": "python3 tools/sprites/build.py",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.3",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.0",
+    "vitest": "^4.1.11"
+  }
+}

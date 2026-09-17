@@ -1,0 +1,15 @@
+{
+  "name": "Barios World",
+  "short_name": "Barios",
+  "description": "Jump. Kaffee. Cambio. Repeat.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0F0D0C",
+  "theme_color": "#FF4FA3",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

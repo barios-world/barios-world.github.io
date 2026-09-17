@@ -1,0 +1,553 @@
+<title>Barios World Spielbuch</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Permanent+Marker&family=Press+Start+2P&family=Caveat:wght@600;700&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<style>
+  :root{
+    --board:#0F0D0C; --sheet:#171311; --sheet2:#1E1917; --line:#2E2724; --line2:#3A312C;
+    --chalk:#F2ECE2; --dim:#A79C90; --faint:#6E635B;
+    --pink:#FF4FA3; --pinkdeep:#C42B75; --cream:#FFF4DC; --gold:#FFC24B;
+    --blue:#3A7BD5; --green:#63B84E; --red:#E8434F; --yellow:#FFC24B; --purple:#9B6BD6; --mint:#6FD8B0;
+    --logo:'Luckiest Guy',system-ui,sans-serif; --brush:'Permanent Marker',cursive;
+    --px:'Press Start 2P',ui-monospace,monospace; --hand:'Caveat','Comic Sans MS',cursive; --body:'IBM Plex Sans',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--board);color:var(--chalk);font-family:var(--body);margin:0;-webkit-font-smoothing:antialiased}
+  img,canvas,.fr{image-rendering:pixelated;image-rendering:crisp-edges}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .wrap{max-width:1290px;margin:0 auto;padding:28px 20px 70px;display:flex;flex-direction:column;gap:34px}
+
+  /* ---------- sheet poster */
+  .sheet{background:var(--sheet);border:1px solid var(--line);border-radius:6px;padding:26px clamp(14px,2.5vw,26px) 22px;position:relative;
+         background-image:radial-gradient(rgba(255,255,255,.025) 1px, transparent 1px);background-size:5px 5px}
+  .sheet::before{content:"";position:absolute;inset:6px;border:1px solid var(--line);border-radius:3px;pointer-events:none}
+  .hdr{display:grid;grid-template-columns:200px 1fr 220px;gap:20px;align-items:center;margin-bottom:22px}
+  @media(max-width:860px){.hdr{grid-template-columns:1fr;justify-items:center;text-align:center}}
+  .note{position:relative;background:#D8CDB4;color:#3A322A;font-family:var(--hand);font-size:21px;line-height:1.15;padding:14px 16px 12px;
+        width:fit-content;max-width:190px;transform:rotate(-3deg);border-radius:2px;box-shadow:0 2px 0 #00000055}
+  .note::before{content:"";position:absolute;top:-8px;left:50%;transform:translateX(-50%) rotate(2deg);width:50px;height:16px;background:#EFE6D2;opacity:.8}
+  .chalk{font-family:var(--hand);font-size:24px;color:var(--pink);line-height:1.15}
+  .chalk.w{color:var(--chalk)} .chalk.d{color:var(--dim)} .chalk.sm{font-size:20px}
+  .rot{display:inline-block;transform:rotate(-2deg)}
+
+  .logo{text-align:center;line-height:.9}
+  .logo .crown{display:block;margin:0 auto 2px}
+  .l1{font-family:var(--logo);font-size:clamp(44px,7.5vw,84px);color:var(--pink);letter-spacing:.02em;
+      text-shadow:3px 0 0 #fff,-3px 0 0 #fff,0 3px 0 #fff,0 -3px 0 #fff,3px 3px 0 #fff,-3px -3px 0 #fff,3px -3px 0 #fff,-3px 3px 0 #fff,6px 7px 0 #14100E}
+  .l2{font-family:var(--logo);font-size:clamp(30px,5.2vw,56px);letter-spacing:.03em;
+      text-shadow:2px 0 0 #fff,-2px 0 0 #fff,0 2px 0 #fff,0 -2px 0 #fff,2px 2px 0 #fff,-2px -2px 0 #fff,5px 6px 0 #14100E}
+  .l2 i{font-style:normal}
+  .tagline{font-family:var(--px);font-size:clamp(9px,1.4vw,12px);color:var(--cream);letter-spacing:.12em;margin-top:14px}
+  .sub{font-family:var(--hand);font-size:22px;color:var(--dim);margin-top:6px}
+
+  .brush{font-family:var(--brush);font-size:clamp(34px,5vw,58px);color:var(--pink);line-height:1;text-shadow:3px 3px 0 #14100E;transform:rotate(-2deg);display:inline-block}
+  .brush.w{color:var(--cream)} .brush.sm{font-size:clamp(24px,3.2vw,36px)}
+  .quote{font-family:var(--px);font-size:9px;color:var(--dim);letter-spacing:.06em;margin-top:12px;line-height:1.7}
+
+  .port{display:flex;flex-direction:column;align-items:center;gap:8px;justify-self:end}
+  @media(max-width:860px){.port{justify-self:center}}
+  .port .frame{background:var(--sheet2);border:2px solid var(--line2);border-radius:8px;padding:8px 10px 4px;line-height:0}
+  .counter{display:flex;align-items:center;gap:12px;margin-top:10px}
+  .counter .who{font-family:var(--px);font-size:10px;color:var(--cream);line-height:1.8}
+  .counter .who b{display:block;font-weight:400;color:var(--pink);font-size:9px}
+  .hearts{display:flex;gap:3px;margin-top:4px}
+  .hp{width:200px;height:12px;border:2px solid #6A3A42;border-radius:3px;background:#1a0f12;overflow:hidden;margin-top:6px}
+  .hp i{display:block;height:100%;width:74%;background:repeating-linear-gradient(90deg,var(--red) 0 10px,#B22E3A 10px 12px)}
+  .hplbl{font-family:var(--px);font-size:8px;color:var(--red);letter-spacing:.06em;margin-top:8px}
+
+  /* ---------- animation rows */
+  .rows{display:flex;flex-direction:column}
+  .row{display:grid;grid-template-columns:150px 1fr 190px;gap:16px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}
+  .row:last-child{border-bottom:none}
+  @media(max-width:860px){.row{grid-template-columns:1fr}.row .cn{text-align:left}}
+  .tag{display:inline-block;font-family:var(--px);font-size:9px;letter-spacing:.06em;background:var(--pink);color:#2B0715;padding:7px 10px;border-radius:4px;line-height:1.4}
+  .tag.sm{font-size:7.5px;padding:5px 7px}
+  .tagsub{display:block;font-family:var(--px);font-size:7px;color:var(--faint);margin-top:8px;letter-spacing:.05em;line-height:1.7}
+  .frames{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;padding:0 0 6px;border-bottom:1px solid var(--line2)}
+  .fr{flex:none;background-repeat:no-repeat}
+  .live{position:relative;flex:none}
+  .live::after{content:"LIVE";position:absolute;left:0;top:-14px;font-family:var(--px);font-size:6.5px;color:var(--mint);letter-spacing:.1em}
+  .live canvas{display:block}
+  .lbl{display:flex;flex-direction:column;align-items:center;gap:6px;flex:none}
+  .lbl span{font-family:var(--px);font-size:6.5px;color:var(--dim);letter-spacing:.05em;text-align:center;line-height:1.6}
+  .cn{font-family:var(--hand);font-size:21px;color:var(--pink);text-align:right;line-height:1.1}
+  .cn.w{color:var(--dim)}
+
+  /* ---------- environment scene */
+  .envhd{display:flex;align-items:center;gap:14px;margin:26px 0 12px}
+  .scene{overflow-x:auto;padding:14px 4px 6px;border-top:1px solid var(--line)}
+  .scene img{display:block}
+  .foot3{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:center;margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+  .foot3 .chalk:last-child{text-align:right}
+  @media(max-width:860px){.foot3{grid-template-columns:1fr;text-align:center}.foot3 .chalk:last-child{text-align:center}}
+
+  /* ---------- level-up list */
+  .lv{font-family:var(--px);font-size:9px;line-height:2.4;color:var(--chalk);letter-spacing:.04em}
+  .lv b{font-weight:400;color:var(--pink)}
+
+  /* ---------- power-up panels */
+  .pu{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin-top:8px}
+  .pcard{border:3px solid;border-radius:10px;background:var(--sheet2);overflow:hidden;display:flex;flex-direction:column}
+  .ptitle{font-family:var(--logo);font-size:24px;letter-spacing:.03em;padding:10px 14px 6px;color:#14100E;text-align:center;line-height:1}
+  .pmotto{font-family:var(--px);font-size:7.5px;letter-spacing:.06em;text-align:center;padding:0 14px 9px;color:#14100E;opacity:.85}
+  .pbody{display:grid;grid-template-columns:1fr auto;gap:12px;padding:14px 14px 8px;align-items:start}
+  .phero{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:8px;min-height:196px}
+  .pchalk{font-family:var(--hand);font-size:20px;line-height:1.05;text-align:center}
+  .pitem{background:var(--sheet);border:2px solid var(--line2);border-radius:6px;padding:8px;display:flex;flex-direction:column;align-items:center;gap:8px}
+  .pitem span{font-family:var(--px);font-size:6.5px;color:var(--dim);text-align:center;line-height:1.6;letter-spacing:.04em}
+  .pstrip{display:flex;gap:6px;align-items:flex-end;padding:10px 14px 4px;border-top:1px solid var(--line);overflow-x:auto}
+  .pstrip .lbl span{font-size:6px}
+  .pmech{font-size:13px;line-height:1.6;color:var(--dim);margin:0;padding:10px 14px 0}
+  .pmech b{color:var(--chalk);font-weight:500}
+  .perks{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px 14px}
+  .perk{font-family:var(--px);font-size:7px;letter-spacing:.05em;padding:6px 7px;border-radius:3px;color:#14100E}
+
+  /* ---------- plan tables */
+  .grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+  .box{background:var(--sheet2);border:1px solid var(--line);border-radius:8px;padding:16px}
+  .box h3{font-family:var(--px);font-size:9px;margin:0 0 9px;color:var(--pink);line-height:1.6;letter-spacing:.04em}
+  .box p{margin:0;font-size:13.5px;line-height:1.6;color:var(--dim)}
+  .box p b{color:var(--chalk);font-weight:500}
+  .scroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:560px}
+  th{text-align:left;font-family:var(--px);font-size:7.5px;letter-spacing:.06em;color:var(--pink);padding:0 14px 10px 0;border-bottom:1px solid var(--line);font-weight:400;white-space:nowrap}
+  td{padding:11px 14px 11px 0;border-bottom:1px solid var(--line);color:var(--dim);vertical-align:top;line-height:1.55}
+  td:first-child{color:var(--chalk)} td b{color:var(--chalk);font-weight:500}
+  .num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .sechd{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin:26px 0 14px}
+  .check{font-family:var(--px);font-size:8.5px;line-height:2.4;color:var(--chalk);letter-spacing:.04em}
+  .check i{font-style:normal;color:var(--pink);margin-right:8px}
+
+  .pagefoot{text-align:center;padding-top:10px}
+  .pagefoot .a{font-family:var(--hand);font-size:28px;color:var(--pink)}
+  .pagefoot .b{font-family:var(--px);font-size:8.5px;color:var(--faint);margin-top:12px;letter-spacing:.1em}
+</style>
+
+<h2 class="sr">Barios World Spielbuch: alle Figuren, Animationen, Power-Ups, Gegner, Boss, Umgebungen und der Bauplan des Spiels.</h2>
+
+<div class="wrap">
+
+<!-- ====================================================== SHEET 1: BARIO -->
+<section class="sheet">
+  <div class="hdr">
+    <div>
+      <div class="note">Kleine Schritte<br>grosse Pl&auml;ne &#9829;</div>
+      <div class="counter">
+        <img src="%%img:port_bario%%" style="%%wh:port_bario:2%%" alt="">
+        <div class="who"><b>SPIELFIGUR</b>BARIO &times; 3
+          <div class="hearts"><img src="%%img:herz_s%%" style="%%wh:herz_s:2%%" alt=""><img src="%%img:herz_s%%" style="%%wh:herz_s:2%%" alt=""><img src="%%img:herz_s%%" style="%%wh:herz_s:2%%" alt=""></div>
+        </div>
+      </div>
+    </div>
+    <div class="logo">
+      <img class="crown" src="%%img:it_krone%%" style="%%wh:it_krone:2%%" alt="">
+      <div class="l1">BARIOS</div>
+      <div class="l2"><i style="color:#3A7BD5">W</i><i style="color:#4CB34A">O</i><i style="color:#E8434F">R</i><i style="color:#FFC24B">L</i><i style="color:#63B84E">D</i></div>
+      <div class="tagline">JUMP. KAFFEE. CAMBIO. REPEAT.</div>
+    </div>
+    <div class="port">
+      <div class="frame"><canvas %%anim:bario_idle%% data-scale="3" data-fps="2" style="%%wh:bario_idle:3%%"></canvas></div>
+      <div class="chalk rot">Khusra Mund &#9829;</div>
+    </div>
+  </div>
+
+  <div class="rows">
+    <div class="row">
+      <div><span class="tag">IDLE</span><span class="tagsub">2 FRAMES &middot; 2 FPS</span></div>
+      <div class="frames">%%frames:bario_idle:2%%<div class="live"><canvas %%anim:bario_idle%% data-scale="2" data-fps="2" style="%%wh:bario_idle:2%%"></canvas></div></div>
+      <div class="cn">Immer bereit.<br><span class="cn w" style="font-size:18px">Kopf dreht sich zur Laufrichtung</span></div>
+    </div>
+    <div class="row">
+      <div><span class="tag">WALK</span><span class="tagsub">4 FRAMES &middot; 10 FPS</span></div>
+      <div class="frames">%%frames:bario_walk:2%%<div class="live"><canvas %%anim:bario_walk%% data-scale="2" data-fps="10" style="%%wh:bario_walk:2%%"></canvas></div></div>
+      <div class="cn">Kleine Schritte</div>
+    </div>
+    <div class="row">
+      <div><span class="tag">RUN</span><span class="tagsub">4 FRAMES &middot; 14 FPS</span></div>
+      <div class="frames">%%frames:bario_run:2%%<div class="live"><canvas %%anim:bario_run%% data-scale="2" data-fps="14" style="%%wh:bario_run:2%%"></canvas></div></div>
+      <div class="cn">Grosse Pl&auml;ne</div>
+    </div>
+    <div class="row">
+      <div><span class="tag">JUMP &middot; HURT</span><span class="tagsub">JE 1 FRAME</span></div>
+      <div class="frames">
+        <div class="lbl">%%frames:bario_jump:2%%<span>JUMP</span></div>
+        <div class="lbl">%%frames:bario_hurt:2%%<span>HURT</span></div>
+      </div>
+      <div class="cn">Halten = h&ouml;her.<br><span class="cn w" style="font-size:18px">1,5 s unverwundbar nach Treffer</span></div>
+    </div>
+    <div class="row">
+      <div><span class="tag">ATTACK</span><span class="tagsub">5 ANGRIFFE</span></div>
+      <div class="frames">
+        <div class="lbl">%%frames:atk_kaffee:2%%<span>KAFFEE</span></div>
+        <div class="lbl">%%frames:atk_cambio:2%%<span>CAMBIO</span></div>
+        <div class="lbl">%%frames:atk_buch:2%%<span>BUCH</span></div>
+        <div class="lbl">%%frames:atk_khusra:2%%<span>KHUSRA</span></div>
+        <div class="lbl">%%frames:atk_mund:2%%<span>KHUSRA MUND</span></div>
+      </div>
+      <div class="cn">Khusra Mund!<br><span class="cn w" style="font-size:18px">Ultimate &mdash; r&auml;umt den ganzen Screen</span></div>
+    </div>
+    <div class="row">
+      <div><span class="tag">SPECIAL</span><span class="tagsub">4 ZUST&Auml;NDE</span></div>
+      <div class="frames">
+        <div class="lbl">%%frames:sp_kaffee:2%%<span>KAFFEE POWER</span></div>
+        <div class="lbl">%%frames:sp_buecher:2%%<span>B&Uuml;CHER LESEN</span></div>
+        <div class="lbl">%%frames:sp_cambio:2%%<span>CAMBIO MASTER</span></div>
+        <div class="lbl">%%frames:sp_khusra:2%%<span>KHUSRA ENERGY</span></div>
+      </div>
+      <div class="cn" style="text-align:left">
+        <div class="lv"><b>LEVEL UP &uarr;</b><br>MEHR KAFFEE<br>MEHR CAMBIO<br>MEHR WISSEN<br>MEHR KHUSRA<br>MEHR DU <span style="color:var(--pink)">&#9829;</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="envhd"><span class="tag">ENVIRONMENT ELEMENTS</span><span class="chalk d sm">Welt 1 &middot; Der Boulevard &middot; 32-px-Kacheln</span></div>
+  <div class="scene"><img src="%%img:scene_barios%%" style="%%wh:scene_barios:2%%" alt="Umgebungselemente: Schild, Kaffee, Fragezeichen-Block, B&uuml;cher, Cambio-Karten, pinke Pipe, Palme, Zielfahne"></div>
+  <div class="foot3"><div class="chalk">Life is<br>Cambio &#9829;</div><div class="chalk w">Same shit &#9829; different level &#9829;</div><div class="chalk">Khusra<br>forever</div></div>
+</section>
+
+<!-- ====================================================== SHEET 2: POWER UPS -->
+<section class="sheet">
+  <div class="hdr">
+    <div><div class="chalk w" style="font-size:26px;line-height:1">Same Bario<br>different power<br><span style="color:var(--pink)">&#9829;</span></div></div>
+    <div class="logo">
+      <div class="l1" style="font-size:clamp(36px,5.5vw,62px)">BARIOS</div>
+      <div class="l2" style="font-size:clamp(24px,3.8vw,42px)"><i style="color:#3A7BD5">W</i><i style="color:#4CB34A">O</i><i style="color:#E8434F">R</i><i style="color:#FFC24B">L</i><i style="color:#63B84E">D</i></div>
+      <div class="tagline">POWER UPS CHANGE EVERYTHING.</div>
+    </div>
+    <div class="port">
+      <div class="note" style="transform:rotate(3deg);font-size:19px">Kleine Schritte<br>grosse Pl&auml;ne &#9829;</div>
+      <div class="chalk sm">It&rsquo;s a me... Bario!</div>
+    </div>
+  </div>
+
+  <div class="pu">
+    <div class="pcard" style="border-color:var(--pink)">
+      <div class="ptitle" style="background:var(--pink)">SPORT-SUCHTI BARIO</div><div class="pmotto" style="background:var(--pink)">MEHR POWER. IMMER WEITER.</div>
+      <div class="pbody">
+        <div class="phero"><img src="%%img:form_sport%%" style="%%wh:form_sport:3%%" alt=""><div class="pchalk" style="color:var(--pink)">No excuses<br>only Barios &#9829;</div></div>
+        <div class="pitem"><img src="%%img:it_hantel%%" style="%%wh:it_hantel:3%%" alt=""><span>DUMBBELL<br>= POWER UP</span></div>
+      </div>
+      <div class="pstrip">%%frames:formwalk_sport:2%%</div>
+      <p class="pmech"><b>Hantel.</b> Nahkampf zertr&uuml;mmert Bl&ouml;cke und Panzer, Sprung +40&nbsp;%, Stampfen schl&auml;gt Gegner durch d&uuml;nne B&ouml;den. Daf&uuml;r tr&auml;ger &mdash; l&auml;ngerer Bremsweg.</p>
+      <div class="perks"><span class="perk" style="background:var(--pink)">STRENGTH BOOST</span><span class="perk" style="background:var(--pink)">HIGHER JUMPS</span><span class="perk" style="background:var(--pink)">UNSTOPPABLE ENERGY</span></div>
+    </div>
+
+    <div class="pcard" style="border-color:var(--blue)">
+      <div class="ptitle" style="background:var(--blue)">BOXER BARIO</div><div class="pmotto" style="background:var(--blue)">PUNCHEN STATT REDEN.</div>
+      <div class="pbody">
+        <div class="phero"><img src="%%img:form_boxer%%" style="%%wh:form_boxer:3%%" alt=""><div class="pchalk" style="color:var(--blue)">One two<br>Cambio!</div></div>
+        <div class="pitem"><img src="%%img:it_glove%%" style="%%wh:it_glove:3%%" alt=""><span>BOXING GLOVES<br>= POWER UP</span></div>
+      </div>
+      <div class="pstrip">%%frames:formwalk_boxer:2%%</div>
+      <p class="pmech"><b>Boxhandschuhe.</b> Dreier-Combo: links, rechts, Haken. Der dritte Schlag schleudert den Gegner als Geschoss durch die Reihe. Kurze Reichweite, h&ouml;chster Schaden im Spiel.</p>
+      <div class="perks"><span class="perk" style="background:var(--blue)">PUNCH COMBO</span><span class="perk" style="background:var(--blue)">STRONGER ATTACKS</span><span class="perk" style="background:var(--blue)">KNOCK &rsquo;EM OUT</span></div>
+    </div>
+
+    <div class="pcard" style="border-color:var(--yellow)">
+      <div class="ptitle" style="background:var(--yellow)">SKATER BARIO</div><div class="pmotto" style="background:var(--yellow)">ROLLEN. TRICKS. FREIHEIT.</div>
+      <div class="pbody">
+        <div class="phero"><img src="%%img:form_skater%%" style="%%wh:form_skater:3%%" alt=""><div class="pchalk" style="color:var(--yellow)">Good tricks<br>better days</div></div>
+        <div class="pitem"><img src="%%img:it_skate%%" style="%%wh:it_skate:3%%" alt=""><span>SKATEBOARD<br>= POWER UP</span></div>
+      </div>
+      <div class="pstrip">%%frames:formwalk_skater:2%%</div>
+      <p class="pmech"><b>Skateboard.</b> Dauertempo 320, Gel&auml;nder und Schienen werden grindbar, Rampen geben Schub. Tricks in der Luft f&uuml;llen den Khusra-Meter. Bremsen dauert &mdash; das Risiko-Powerup.</p>
+      <div class="perks"><span class="perk" style="background:var(--yellow)">SKATE TRICKS</span><span class="perk" style="background:var(--yellow)">HIGHER JUMPS</span><span class="perk" style="background:var(--yellow)">SMOOTH MOVEMENT</span></div>
+    </div>
+
+    <div class="pcard" style="border-color:var(--green)">
+      <div class="ptitle" style="background:var(--green)">SPRAYER BARIO</div><div class="pmotto" style="background:var(--green)">FARBE STATT GRAU.</div>
+      <div class="pbody">
+        <div class="phero"><img src="%%img:form_sprayer%%" style="%%wh:form_sprayer:3%%" alt=""><div class="pchalk" style="color:var(--green)">Make Barios<br>World brighter</div></div>
+        <div class="pitem"><img src="%%img:it_spray%%" style="%%wh:it_spray:3%%" alt=""><span>SPRAY CAN<br>= POWER UP</span></div>
+      </div>
+      <div class="pstrip">%%frames:formwalk_sprayer:2%%</div>
+      <p class="pmech"><b>Spraydose.</b> Bemalte Gegner laufen 3&nbsp;s r&uuml;ckw&auml;rts. <b>Graue Fl&auml;chen werden begehbar, sobald du sie anspr&uuml;hst</b> &mdash; das R&auml;tsel-Powerup.</p>
+      <div class="perks"><span class="perk" style="background:var(--green)">PAINT ATTACK</span><span class="perk" style="background:var(--green)">COLOR POWER</span><span class="perk" style="background:var(--green)">CLEAN THE WORLD (OR NOT)</span></div>
+    </div>
+
+    <div class="pcard" style="border-color:var(--purple)">
+      <div class="ptitle" style="background:var(--purple)">DJ BARIO</div><div class="pmotto" style="background:var(--purple)">BEATS. CAMBIO. VIBES.</div>
+      <div class="pbody">
+        <div class="phero"><img src="%%img:form_dj%%" style="%%wh:form_dj:3%%" alt=""><div class="pchalk" style="color:var(--purple)">Good beats<br>better days</div></div>
+        <div class="pitem"><img src="%%img:it_phones%%" style="%%wh:it_phones:3%%" alt=""><span>HEADSET<br>= POWER UP</span></div>
+      </div>
+      <div class="pstrip">%%frames:formwalk_dj:2%%</div>
+      <p class="pmech"><b>Kopfh&ouml;rer.</b> Die Schallwelle <b>schiebt</b> statt zu t&ouml;ten &mdash; in Abgr&uuml;nde, aufeinander. Angriff auf dem Takt der Levelmusik = doppelter Schaden. Der Rhythmus-Powerup.</p>
+      <div class="perks"><span class="perk" style="background:var(--purple)">SOUNDWAVE ATTACK</span><span class="perk" style="background:var(--purple)">CROWD CONTROL</span><span class="perk" style="background:var(--purple)">POSITIVE VIBES</span></div>
+    </div>
+
+    <div class="pcard" style="border-color:var(--red)">
+      <div class="ptitle" style="background:var(--red)">ROCKER BARIO</div><div class="pmotto" style="background:var(--red)">LAUTER. WILDER. FREIER.</div>
+      <div class="pbody">
+        <div class="phero"><img src="%%img:form_rocker%%" style="%%wh:form_rocker:3%%" alt=""><div class="pchalk" style="color:var(--red)">Rock Cambio<br>forever</div></div>
+        <div class="pitem"><img src="%%img:it_gitarre%%" style="%%wh:it_gitarre:3%%" alt=""><span>ROCKER VEST<br>= POWER UP</span></div>
+      </div>
+      <div class="pstrip">%%frames:formwalk_rocker:2%%</div>
+      <p class="pmech"><b>Weste und Gitarre.</b> Powerchord: Fl&auml;chenschaden im Umkreis, bricht jede Deckung, bet&auml;ubt alles auf dem Screen f&uuml;r 1&nbsp;s. Lange Aufladung &mdash; kein Spammen.</p>
+      <div class="perks"><span class="perk" style="background:var(--red)">ROCK POWER</span><span class="perk" style="background:var(--red)">MUSIC BLAST</span><span class="perk" style="background:var(--red)">FEAR NOTHING</span></div>
+    </div>
+  </div>
+
+  <div class="foot3" style="align-items:flex-start">
+    <div class="chalk d sm">Collect power ups<br>explore new sides of Bario &#9829;</div>
+    <div class="check"><i>&#9745;</i>MEHR POWER<br><i>&#9745;</i>MEHR SPASS<br><i>&#9745;</i>MEHR CAMBIO<br><i>&#9745;</i>MEHR DU <span style="color:var(--pink)">&#9829;</span></div>
+    <div class="chalk">Level up in<br>real life too &#9829;<br><span class="chalk w sm">Game on &#9829;</span></div>
+  </div>
+</section>
+
+<!-- ====================================================== SHEET 3: MEISTERSAGER -->
+<section class="sheet">
+  <div class="hdr">
+    <div>
+      <div class="note">Gleicher Spirit<br>anderes Level &#9829;</div>
+      <div class="counter">
+        <img src="%%img:port_meister%%" style="%%wh:port_meister:2%%" alt="">
+        <div class="who"><b>GEGNER</b>VFB MOB &times; &#8734;
+          <div class="hearts"><img src="%%img:herz_s%%" style="%%wh:herz_s:2%%" alt=""><img src="%%img:herz_s%%" style="%%wh:herz_s:2%%" alt=""><img src="%%img:herz_s%%" style="%%wh:herz_s:2%%" alt=""></div>
+        </div>
+      </div>
+    </div>
+    <div class="logo">
+      <span class="brush">DER MEISTER-<br>SAGER</span>
+      <div class="quote">EIN GANZ NORMALER MOB.<br>SPAWNT &Uuml;BERALL. &#9829;</div>
+    </div>
+    <div class="port">
+      <div class="frame"><canvas %%anim:meister_idle%% data-scale="3" data-fps="2" style="%%wh:meister_idle:3%%"></canvas></div>
+      <div class="chalk rot">Meithhter!</div>
+    </div>
+  </div>
+
+  <div class="rows">
+    <div class="row">
+      <div><span class="tag">IDLE</span><span class="tagsub">2 FRAMES</span></div>
+      <div class="frames">%%frames:meister_idle:2%%<div class="live"><canvas %%anim:meister_idle%% data-scale="2" data-fps="2" style="%%wh:meister_idle:2%%"></canvas></div></div>
+      <div class="cn w">Immer gute Laune<br>(leider)</div>
+    </div>
+    <div class="row">
+      <div><span class="tag">WALK</span><span class="tagsub">4 FRAMES &middot; 10 FPS</span></div>
+      <div class="frames">%%frames:meister_walk:2%%<div class="live"><canvas %%anim:meister_walk%% data-scale="2" data-fps="10" style="%%wh:meister_walk:2%%"></canvas></div></div>
+      <div class="cn w">VfB &uuml;berall</div>
+    </div>
+    <div class="row">
+      <div><span class="tag">RUN</span><span class="tagsub">4 FRAMES &middot; 14 FPS</span></div>
+      <div class="frames">%%frames:meister_run:2%%<div class="live"><canvas %%anim:meister_run%% data-scale="2" data-fps="14" style="%%wh:meister_run:2%%"></canvas></div></div>
+      <div class="cn w">Schnell zum n&auml;chsten<br>&bdquo;Meithhter!&ldquo;</div>
+    </div>
+    <div class="row">
+      <div><span class="tag">ATTACK (MEISTER!)</span><span class="tagsub">SCHALLWELLE &middot; 0,5 S TELEGRAPH</span></div>
+      <div class="frames">%%frames:meister_attack:2%%</div>
+      <div class="cn">Meithhter!<br>Meithhter!<br>Meithhter! &#9829;</div>
+    </div>
+    <div class="row">
+      <div><span class="tag">SPECIAL 1: NJUCKEL ATTACKE</span><span class="tagsub">GR&Auml;TSCHE &middot; NUR SPRINGEN HILFT</span></div>
+      <div class="frames">%%frames:meister_slide:2%%</div>
+      <div class="cn w">Er kommt<br>von hinten</div>
+    </div>
+    <div class="row">
+      <div><span class="tag">SPECIAL 2: VFB SUPPORT</span><span class="tagsub">BUFF F&Uuml;R ALLE MOBS IM UMKREIS</span></div>
+      <div class="frames">%%frames:meister_support:2%%</div>
+      <div class="cn">VfB f&uuml;r immer</div>
+    </div>
+    <div class="row">
+      <div><span class="tag">HIT &middot; DEFEAT</span><span class="tagsub">RESPAWN NACH 20 S</span></div>
+      <div class="frames"><div class="lbl">%%frames:meister_hit:2%%<span>HIT</span></div><div class="lbl">%%frames:meister_defeat:2%%<span>DEFEAT</span></div></div>
+      <div class="cn w">Auch im Game<br>nur eine Legende</div>
+    </div>
+  </div>
+
+  <div class="sechd"><span class="tag">SECHS VARIANTEN</span><span class="chalk d sm">Ein Charakter, sechs Requisiten &mdash; billigste Art-Pipeline der Welt</span></div>
+  <div class="scroll"><table>
+    <thead><tr><th>Variante</th><th>Requisite</th><th>Verhalten</th><th>Lehrt</th></tr></thead>
+    <tbody>
+      <tr><td>Meistersager</td><td>&mdash;</td><td>L&auml;uft stur, ruft <b>Meithhter!</b> Stomp = weg.</td><td>Draufspringen</td></tr>
+      <tr><td>Njuckel-Werfer</td><td>Nuckel</td><td>Wirft im Bogen, 1,2&nbsp;s Nachladen &mdash; das Fenster.</td><td>Rhythmus lesen</td></tr>
+      <tr><td>Schal-Schwinger</td><td>Schal</td><td>Schal rotiert vorne, blockt frontal alles.</td><td>Von hinten / Buchwurf</td></tr>
+      <tr><td>Fahnentr&auml;ger</td><td>VfB-Fahne</td><td>Macht alle Mobs im Umkreis schneller.</td><td>Priorit&auml;ten setzen</td></tr>
+      <tr><td>Trommler</td><td>Trommel</td><td>Steht fest, sein Takt beschleunigt den ganzen Screen.</td><td>Erst die Quelle</td></tr>
+      <tr><td>Fan-Block</td><td>3 gestapelt</td><td>Nur von der Seite zu knacken.</td><td>Winkel statt Kraft</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="envhd"><span class="tag">ENVIRONMENT ELEMENTS (SPAWNT OFT!)</span><span class="chalk d sm">Welt 4 &middot; VFB Area</span></div>
+  <div class="scene"><img src="%%img:scene_vfb%%" style="%%wh:scene_vfb:2%%" alt="VFB Area: Schild, Laterne, Banner, Winamax-Kiste, Fu&szlig;ball, Pylone, Bande, Schild Meister Tr&auml;ume leben immer, Baum, Fahne, Schal, Nuckel"></div>
+  <div class="foot3"><div class="chalk d">Football is<br>Cambio &#9829;</div><div class="chalk w">Barios World &mdash; alle sind ein Teil der Story. &#9829;</div><div class="chalk d">Same shit<br>different level</div></div>
+</section>
+
+<!-- ====================================================== SHEET 4: DER DIREKTOR -->
+<section class="sheet">
+  <div class="hdr">
+    <div>
+      <div class="note">Same shit<br>different level &#9829;</div>
+      <div class="counter">
+        <img src="%%img:port_direktor%%" style="%%wh:port_direktor:2%%" alt="">
+        <div class="who"><b>FINAL BOSS</b>DER DIREKTOR &times; &#8734;
+          <div class="hearts"><img src="%%img:herz_s%%" style="%%wh:herz_s:2%%" alt=""><img src="%%img:herz_s%%" style="%%wh:herz_s:2%%" alt=""><img src="%%img:herz_s%%" style="%%wh:herz_s:2%%" alt=""><img src="%%img:herz_s%%" style="%%wh:herz_s:2%%" alt=""><img src="%%img:herz_s%%" style="%%wh:herz_s:2%%" alt=""></div>
+          <div class="hplbl">BOSS HP</div><div class="hp"><i></i></div>
+        </div>
+      </div>
+    </div>
+    <div class="logo">
+      <span class="brush">FINAL BOSS</span><br>
+      <span class="brush w sm" style="margin-top:8px">DER DIREKTOR</span>
+      <div class="quote">&bdquo;RUHE IM SPIEL, CHAOS IM KOPF.&ldquo;</div>
+    </div>
+    <div class="port">
+      <div class="frame"><canvas %%anim:direktor_idle%% data-scale="3" data-fps="2" style="%%wh:direktor_idle:3%%"></canvas></div>
+      <div class="chalk w sm rot">Style hits harder<br>than skills &#9829;</div>
+    </div>
+  </div>
+
+  <div class="rows">
+    <div class="row">
+      <div><span class="tag">IDLE</span><span class="tagsub">2 FRAMES &middot; KOPF FOLGT DIR</span></div>
+      <div class="frames">%%frames:direktor_idle:2%%<div class="live"><canvas %%anim:direktor_idle%% data-scale="2" data-fps="2" style="%%wh:direktor_idle:2%%"></canvas></div></div>
+      <div class="cn w">Always<br>watching &#9819;</div>
+    </div>
+    <div class="row">
+      <div><span class="tag">WALK</span><span class="tagsub">4 FRAMES &middot; ER RENNT NIE</span></div>
+      <div class="frames">%%frames:direktor_walk:2%%<div class="live"><canvas %%anim:direktor_walk%% data-scale="2" data-fps="8" style="%%wh:direktor_walk:2%%"></canvas></div></div>
+      <div class="cn w">Clean moves,<br>dirty intentions &#9819;</div>
+    </div>
+    <div class="row">
+      <div><span class="tag">RAGE</span><span class="tagsub">PHASE 2 &middot; AB 66 % HP</span></div>
+      <div class="frames">%%frames:direktor_rage:2%%</div>
+      <div class="cn">Same guy.<br>Different energy. &#9819;</div>
+    </div>
+    <div class="row">
+      <div><span class="tag">ATTACK</span><span class="tagsub">PUNCH &middot; SPINKICK &middot; SLASH</span></div>
+      <div class="frames">%%frames:direktor_kick:2%%</div>
+      <div class="cn w">Control<br>the game. &#9819;</div>
+    </div>
+    <div class="row">
+      <div><span class="tag">SPECIAL: BRILLE SCHMEISSEN</span><span class="tagsub">BUMERANG &middot; 2 AUSWEICHFENSTER</span></div>
+      <div class="frames">%%frames:direktor_brille:2%%</div>
+      <div class="cn">Brille schmeissen<br>= instant disrespect.</div>
+    </div>
+    <div class="row">
+      <div><span class="tag">SPECIAL 2: KAFFEE REGEN</span><span class="tagsub">3 WELLEN &middot; SICHERE SPUREN LESEN</span></div>
+      <div class="frames">%%frames:direktor_regen:2%%</div>
+      <div class="cn w">Heiss. Schwarz.<br>&Uuml;berall. &#9819;</div>
+    </div>
+    <div class="row">
+      <div><span class="tag">DEFEAT</span><span class="tagsub">NUR DIE JACKE BLEIBT</span></div>
+      <div class="frames">%%frames:direktor_defeat:2%%</div>
+      <div class="cn w">Vielleicht beim<br>n&auml;chsten Level &hellip;<br><span class="cn">&bdquo;Game over. Respect anyway.&ldquo;</span></div>
+    </div>
+  </div>
+
+  <div class="sechd"><span class="tag">DER KAMPF</span><span class="chalk d sm">More drip, more damage</span></div>
+  <div class="scroll"><table>
+    <thead><tr><th>Phase</th><th>HP</th><th>Was er macht</th><th>Dein Fenster</th></tr></thead>
+    <tbody>
+      <tr><td>1 &middot; CLEAN</td><td class="num">100&ndash;66&nbsp;%</td><td>Geht nur. <b>Brille schmeissen</b> als Bumerang, dazu Punch, Spinkick, Kick mit Slash.</td><td>1,2&nbsp;s nach jeder Combo</td></tr>
+      <tr><td>2 &middot; RAGE</td><td class="num">66&ndash;33&nbsp;%</td><td>Pinke Flammen, Screen f&auml;rbt sich, Musik legt eine Spur drauf. <b>Kaffee Regen</b> in drei Wellen, hei&szlig;e Pf&uuml;tzen bleiben. Kristalle aus dem Boden.</td><td>Fackeln abschie&szlig;en &rarr; 2&nbsp;s bet&auml;ubt</td></tr>
+      <tr><td>3 &middot; WATCHING</td><td class="num">33&ndash;0&nbsp;%</td><td>Saal wird dunkel. Er teleportiert, wirft Nachbilder &mdash; nur der Echte hat einen Schatten.</td><td>Khusra-Meter ist voll: <b>Khusra Mund</b></td></tr>
+      <tr><td>DEFEAT</td><td class="num">0&nbsp;%</td><td>Kniet, kippt, Papiere und Brille fallen. Nur die Jacke mit Krone bleibt. <b>Der G&uuml;rtel leuchtet</b> &mdash; aufheben schaltet den Rematch frei.</td><td>Level &#8734;</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="envhd"><span class="tag">ENVIRONMENT / BOSS ARENA</span><span class="chalk d sm">Alles benutzbar: Fackeln, Kaffeemaschine, Podest, Portr&auml;t</span></div>
+  <div class="scene"><img src="%%img:scene_arena%%" style="%%wh:scene_arena:2%%" alt="Thronsaal: S&auml;ulen, Banner, Fackeln, goldener Thron auf roter Treppe, Pokale, Mondfenster mit Skyline, Tafeln Life is Cambio und Level Unendlich"></div>
+  <div class="foot3"><div class="chalk d">Kaffee. Cambio.<br>Khusra Mund.</div><div class="chalk">&#9829; End of the level. Beginning of a legend. &#9829;</div><div class="chalk d">Alles<br>Kontrolle</div></div>
+</section>
+
+<!-- ====================================================== SHEET 5: DAS SPIEL -->
+<section class="sheet">
+  <div class="hdr" style="grid-template-columns:1fr auto 1fr">
+    <div class="chalk d">Jump. Kaffee.<br>Cambio. Repeat.</div>
+    <div class="logo"><span class="brush w">DAS SPIEL</span><div class="quote">2D JUMP &rsquo;N&rsquo; RUN &middot; IPHONE QUER &middot; 640&times;360 INTERN &middot; 0 &euro;</div></div>
+    <div class="chalk" style="text-align:right">Alle sind ein Teil<br>der Story &#9829;</div>
+  </div>
+
+  <div class="sechd"><span class="tag">DIE WELTEN</span><span class="chalk d sm">Der Park baut sich mit jedem Sieg wieder auf</span></div>
+  <div class="scroll"><table>
+    <thead><tr><th>#</th><th>Welt</th><th>Aus dem Bild</th><th>Mechanik</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td>Der Boulevard</td><td>Roter Teppich mit B-Krone, goldenes Tor, <b>Good People Crazy Times</b></td><td>Tutorial ohne ein Wort Text</td></tr>
+      <tr><td class="num">2</td><td>Barios Coffee</td><td>Riesentasse, Kaffee-Wasserfall, <b>Good Coffee Better People</b></td><td>Dampf-Aufwinde, hei&szlig;e Plattformen</td></tr>
+      <tr><td class="num">3</td><td>Cambio</td><td>Neonschild, Riesenkarten, gr&uuml;ne Filztische, <b>Same Friends Different Rules</b></td><td>Karten als Plattformen, die sich umdrehen</td></tr>
+      <tr><td class="num">4</td><td>VFB Area</td><td>Stadion, Banner, Bande &mdash; Heimat des Mobs</td><td>H&ouml;chste Mob-Dichte, Ball als Geschoss</td></tr>
+      <tr><td class="num">5</td><td>Barios Books</td><td><b>Read More, Be Funnier, Live Longer</b></td><td>Schwebende B&uuml;cher, Zeitlupen-R&auml;tsel</td></tr>
+      <tr><td class="num">6</td><td>Mount Barios</td><td>Berg mit Barios Gesicht, <b>Dream Bigger</b>, Khusra-Neon, Zeppelin</td><td>Achterbahnschienen als Grind-Rails</td></tr>
+      <tr><td class="num">&#8734;</td><td>Der Thronsaal</td><td><b>Exit Reality</b></td><td>Der Direktor, drei Phasen</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="sechd"><span class="tag">SAMMELN &amp; W&Auml;HRUNG</span></div>
+  <div class="grid3">
+    <div class="box"><h3>CAMBIO-KARTEN</h3><p>Zahlenkarten sind Score und W&auml;hrung. <b>4 Royals pro Level</b> versteckt = 100&nbsp;%. Joker &ouml;ffnet den Bonusraum, das Ass die T&uuml;ren. Am Levelende: <b>CAMBIO!</b> &mdash; die Hand wird aufgedeckt.</p></div>
+    <div class="box"><h3>FORMEN</h3><p>Power-Ups wie die Feuerblume: Treffer = eine Stufe zur&uuml;ck. Basis &rarr; Form &rarr; Special. Die vier Specials laufen auf Zeit, <b>Khusra Energy</b> nur bei vollem Meter.</p></div>
+    <div class="box"><h3>BARIOS SHOP</h3><p>Karten ausgeben f&uuml;r Mehr Kaffee, Mehr Cambio, Mehr Wissen, Mehr Khusra &mdash; und <b>Mehr Du: +1 Herz, dauerhaft.</b> Outfits ja, M&uuml;tze bleibt.</p></div>
+  </div>
+
+  <div class="sechd"><span class="tag">HUD &amp; STEUERUNG</span><span class="chalk d sm">Daumen liegen unten &mdash; da kommt nichts Wichtiges hin</span></div>
+  <div class="grid3">
+    <div class="box"><h3>OBEN LINKS</h3><p>Portrait, <b>BARIO &times; 3</b>, drei Herzen &mdash; genau wie auf dem Sheet.</p></div>
+    <div class="box"><h3>OBEN MITTE</h3><p>Khusra-Meter. F&uuml;llt sich &uuml;ber Combos, l&ouml;st Khusra Mund aus.</p></div>
+    <div class="box"><h3>OBEN RECHTS</h3><p>Cambio-Z&auml;hler. Karten fliegen dir zu, sobald du nah bist.</p></div>
+    <div class="box"><h3>UNTEN LINKS</h3><p>Schwebender Joystick &mdash; erscheint dort, wo der Daumen hinf&auml;sst.</p></div>
+    <div class="box"><h3>UNTEN RECHTS</h3><p>Sprung: halten = h&ouml;her. Dar&uuml;ber der Wurf-Knopf der aktiven Form.</p></div>
+    <div class="box"><h3>EINSTELLBAR</h3><p>Gr&ouml;&szlig;e und Position frei, Linksh&auml;nder-Modus, Haptik leicht/mittel/schwer, Assist-Modus.</p></div>
+  </div>
+
+  <div class="sechd"><span class="tag">PHYSIK &amp; GAME FEEL</span><span class="chalk d sm">Live-Regler im Spiel &mdash; du stellst es selbst auf dem iPhone ein</span></div>
+  <div class="scroll"><table>
+    <thead><tr><th>Wert</th><th>Einstellung</th><th>Warum</th></tr></thead>
+    <tbody>
+      <tr><td>Kachel</td><td class="num">32 px</td><td>Bario ist 48&times;64 px gro&szlig; &mdash; 1,7 Kacheln, genau die Sprites oben</td></tr>
+      <tr><td>Gravitation</td><td class="num">1800 px/s&sup2;</td><td>Fallen mit Faktor 1,6 &mdash; kein Schweben</td></tr>
+      <tr><td>Sprung</td><td class="num">620 px/s</td><td>3,3 Kacheln hoch, 4,6 weit bei Vollgas</td></tr>
+      <tr><td>Maximaltempo</td><td class="num">240 px/s</td><td>Skater dauerhaft 320</td></tr>
+      <tr><td>Coyote Time</td><td class="num">100 ms</td><td>Kurz nach der Kante z&auml;hlt der Sprung noch</td></tr>
+      <tr><td>Jump Buffer</td><td class="num">120 ms</td><td>Kurz vor der Landung gedr&uuml;ckt z&auml;hlt trotzdem</td></tr>
+      <tr><td>Hitstop</td><td class="num">60 ms</td><td>Jeder Treffer f&uuml;hlt sich schwer an</td></tr>
+      <tr><td>Tod bis Neustart</td><td class="num">&lt; 1 s</td><td><b>Die wichtigste Zahl im ganzen Spiel</b></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="sechd"><span class="tag">TECHNIK &amp; FAHRPLAN</span><span class="chalk d sm">Alles kostenlos. Wirklich alles.</span></div>
+  <div class="grid3">
+    <div class="box"><h3>ENGINE</h3><p>Phaser&nbsp;3, TypeScript, Vite. Level in Tiled, Sprites genau so wie hier gebaut, Sounds mit jsfxr, Musik in BeepBox.</p></div>
+    <div class="box"><h3>AUF DEM IPHONE</h3><p>Dauer-Link als App-Icon auf dem Homescreen: Vollbild, offline, l&auml;uft immer &mdash; auch wenn kein Rechner an ist. <b>Kein Apple-Account n&ouml;tig.</b></p></div>
+    <div class="box"><h3>60 FPS</h3><p>Texture-Atlas, Object-Pooling f&uuml;r Mobs, Geschosse und Partikel, Culling au&szlig;erhalb des Bildes. Ab iPhone&nbsp;11.</p></div>
+  </div>
+  <div class="scroll" style="margin-top:16px"><table>
+    <thead><tr><th></th><th>Was</th><th>Dauer</th></tr></thead>
+    <tbody>
+      <tr><td>M0</td><td>Setup, Dauer-Link auf deinem iPhone</td><td class="num">&frac12; Tag</td></tr>
+      <tr><td>M1</td><td>Bewegung, Game Feel, Live-Regler</td><td class="num">1&ndash;2 Tage</td></tr>
+      <tr><td>M2</td><td>Level 1: Karten, Mob, Kaffee-Wurf, ?-Block, Zielfahne, Touch</td><td class="num">2&ndash;3 Tage</td></tr>
+      <tr><td>M3</td><td>Tafel-Men&uuml;, Hub, Shop, Speichern, Sound, Assist-Modus</td><td class="num">3 Tage</td></tr>
+      <tr><td>M4</td><td>Die sechs Power-Up-Formen</td><td class="num">1 Woche</td></tr>
+      <tr><td>M5</td><td>Welten 1&ndash;4, Mob-Varianten, Musik</td><td class="num">4&ndash;5 Wochen</td></tr>
+      <tr><td>M6</td><td>Der Direktor, drei Phasen</td><td class="num">1 Woche</td></tr>
+      <tr><td>M7</td><td>Balancing, Politur, Link f&uuml;r deine Freunde</td><td class="num">1 Woche</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<div class="pagefoot">
+  <div class="a">Alle sind ein Teil der Story. &#9829;</div>
+  <div class="b">END OF THE LEVEL. BEGINNING OF A LEGEND.</div>
+</div>
+</div>
+
+<script>
+(function(){
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var cvs = document.querySelectorAll('canvas[data-src]');
+  Array.prototype.forEach.call(cvs, function(cv){
+    var w = +cv.getAttribute('data-w'), h = +cv.getAttribute('data-h'), n = +cv.getAttribute('data-n');
+    var s = +cv.getAttribute('data-scale') || 2, fps = +cv.getAttribute('data-fps') || 8;
+    cv.width = w * s; cv.height = h * s;
+    var ctx = cv.getContext('2d'); ctx.imageSmoothingEnabled = false;
+    var img = new Image();
+    img.onload = function(){
+      var i = 0;
+      function draw(){ ctx.clearRect(0, 0, cv.width, cv.height); ctx.drawImage(img, i * w, 0, w, h, 0, 0, w * s, h * s); }
+      draw();
+      if (reduce || n < 2) return;
+      setInterval(function(){ i = (i + 1) % n; draw(); }, 1000 / fps);
+    };
+    img.src = cv.getAttribute('data-src');
+  });
+})();
+</script>
