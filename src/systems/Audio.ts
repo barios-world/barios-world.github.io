@@ -24,6 +24,41 @@ export const TRACK_TITLE: Track = {
   melVoice: 'triangle',
 };
 
+/** World 2 – Barios Coffee: lazy swing, triangle lead, 100 bpm. */
+export const TRACK_COFFEE: Track = {
+  bpm: 100,
+  melody: [67, 0, 71, 74, 0, 71, 67, 0, 69, 0, 72, 76, 0, 72, 69, 0, 71, 0, 74, 78, 0, 74, 71, 0, 72, 74, 76, 0, 74, 0, 71, 0,
+           67, 0, 71, 74, 0, 76, 74, 0, 72, 0, 69, 72, 0, 74, 72, 0, 71, 0, 67, 71, 0, 74, 71, 0, 69, 67, 66, 0, 67, 0, 0, 0],
+  bass:   [43, 0, 0, 50, 43, 0, 0, 50, 45, 0, 0, 52, 45, 0, 0, 52, 47, 0, 0, 54, 47, 0, 0, 54, 48, 0, 0, 55, 50, 0, 0, 55,
+           43, 0, 0, 50, 43, 0, 0, 50, 45, 0, 0, 52, 45, 0, 0, 52, 47, 0, 0, 54, 47, 0, 0, 54, 45, 0, 0, 50, 43, 0, 0, 0],
+  drums: 'k..Hs..Hk..Hs.H.k..Hs..Hk..Hs.HHk..Hs..Hk..Hs.H.k..Hs..Hk.sHs.HH',
+  melVoice: 'triangle',
+};
+
+/** World 3 – Cambio: minor-key lounge, 112 bpm, sawtooth lead. */
+export const TRACK_CASINO: Track = {
+  bpm: 112,
+  melody: [69, 0, 72, 0, 76, 0, 72, 0, 71, 0, 74, 0, 77, 0, 74, 0, 69, 0, 72, 0, 76, 79, 0, 76, 74, 72, 71, 0, 69, 0, 0, 0,
+           64, 0, 67, 0, 71, 0, 67, 0, 65, 0, 69, 0, 72, 0, 69, 0, 64, 0, 67, 0, 71, 74, 0, 71, 69, 67, 65, 0, 64, 0, 0, 0],
+  bass:   [45, 0, 45, 0, 52, 0, 45, 0, 47, 0, 47, 0, 54, 0, 47, 0, 45, 0, 45, 0, 52, 0, 45, 0, 43, 0, 43, 0, 50, 0, 43, 0,
+           40, 0, 40, 0, 47, 0, 40, 0, 41, 0, 41, 0, 48, 0, 41, 0, 40, 0, 40, 0, 47, 0, 40, 0, 43, 0, 43, 0, 50, 0, 43, 0],
+  drums: 'k.H.s.H.k.H.s.HHk.H.s.H.k.HksHH.k.H.s.H.k.H.s.HHk.H.s.H.k.HksHHH',
+  melVoice: 'sawtooth',
+};
+
+/** World 4 – VFB Area: stomping stadium beat, 128 bpm, square chant. */
+export const TRACK_VFB: Track = {
+  bpm: 128,
+  melody: [67, 67, 0, 67, 69, 0, 71, 0, 67, 67, 0, 67, 74, 0, 71, 0, 67, 67, 0, 67, 69, 0, 71, 72, 71, 69, 67, 0, 64, 0, 67, 0,
+           72, 72, 0, 72, 71, 0, 69, 0, 72, 72, 0, 72, 76, 0, 74, 0, 72, 72, 0, 72, 71, 0, 69, 67, 69, 71, 72, 0, 74, 0, 72, 0],
+  bass:   [43, 0, 43, 0, 43, 0, 47, 0, 43, 0, 43, 0, 50, 0, 47, 0, 43, 0, 43, 0, 45, 0, 47, 0, 43, 0, 43, 0, 40, 0, 43, 0,
+           48, 0, 48, 0, 47, 0, 45, 0, 48, 0, 48, 0, 52, 0, 50, 0, 48, 0, 48, 0, 47, 0, 45, 0, 47, 0, 48, 0, 50, 0, 48, 0],
+  drums: 'k.k.s.H.k.k.s.HHk.k.s.H.k.k.ssHHk.k.s.H.k.k.s.HHk.k.s.H.k.k.ssHH',
+  melVoice: 'square',
+};
+
+export const TRACKS = { boulevard: TRACK_BOULEVARD, coffee: TRACK_COFFEE, casino: TRACK_CASINO, vfb: TRACK_VFB, title: TRACK_TITLE };
+
 class Synth {
   private ctx?: AudioContext;
   private master?: GainNode;

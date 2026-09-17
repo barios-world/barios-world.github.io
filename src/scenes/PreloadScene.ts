@@ -2,7 +2,10 @@ import Phaser from 'phaser';
 import { LEVELS } from '../data/levels';
 import atlasPng from '../assets/atlas.png';
 import atlasJson from '../assets/atlas.json?url';
-import tilesPng from '../assets/tiles.png';
+import tilesW1 from '../assets/tiles_w1.png';
+import tilesW2 from '../assets/tiles_w2.png';
+import tilesW3 from '../assets/tiles_w3.png';
+import tilesW4 from '../assets/tiles_w4.png';
 
 // Level files are imported as hashed URLs so the service worker can cache them safely.
 const LEVEL_URLS = import.meta.glob('../assets/levels/*.tmj', { query: '?url', import: 'default', eager: true }) as Record<string, string>;
@@ -31,8 +34,11 @@ export class PreloadScene extends Phaser.Scene {
     this.load.once('complete', () => { bar.destroy(); txt.destroy(); sub.destroy(); });
 
     this.load.atlas('spr', atlasPng, atlasJson);
-    this.load.image('tiles', tilesPng);
-    this.load.spritesheet('tilesS', tilesPng, { frameWidth: 32, frameHeight: 32 });
+    this.load.image('tiles_w1', tilesW1);
+    this.load.image('tiles_w2', tilesW2);
+    this.load.image('tiles_w3', tilesW3);
+    this.load.image('tiles_w4', tilesW4);
+    this.load.spritesheet('tilesS', tilesW1, { frameWidth: 32, frameHeight: 32 });
     for (const l of LEVELS) {
       const file = l.file.replace(/^levels\//, '');
       const url = Object.entries(LEVEL_URLS).find(([k]) => k.endsWith('/' + file))?.[1];

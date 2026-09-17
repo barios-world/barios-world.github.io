@@ -95,6 +95,60 @@ def assemble(include_scenes=True):
     hill.ellipse(30, 20, 10, 6, 'F'); add('hill', hill)
     far = G(120, 48); far.ellipse(60, 58, 64, 46, 'p', n=2.2, only=lambda x, y: y < 48); far.ellipse(58, 60, 60, 44, 'P', n=2.2, only=lambda x, y: y < 48); add('hill_far', far)
     add('bush', E.bush(30)); add('palm', E.palm(52)); add('cloud', E.cloud(26)); add('sign', E.sign(['BARIOS WORLD >']))
+    add('banner', E.banner_vfb()); add('lamp', E.lamp()); add('tree', E.tree()); add('crate', E.crate()); add('cone', E.cone()); add('bench', E.bench())
+    add('chalk_cambio', E.chalkboard(['LIFE IS', 'CAMBIO'])); add('sign_vfb', E.sign(['VFB AREA >']))
+    # --- world decor
+    def scale_up(g, k):
+        h = G(g.w * k, g.h * k)
+        for y in range(g.h):
+            for x in range(g.w):
+                c = g.d[y][x]
+                if c != '.':
+                    h.rect(x * k, y * k, x * k + k - 1, y * k + k - 1, c)
+        return h
+    add('deco_cup_big', scale_up(I.kaffee(), 3))
+    neon = G(76, 22); neon.rect(0, 0, 75, 21, '#'); neon.rect(1, 1, 74, 20, '@'); neon.outline('K')
+    from font import draw_text as _dt, text_width as _tw
+    _dt(neon, (76 - _tw('CAMBIO') * 2) // 2, 6, 'CAMBIO', '&')
+    # double-size letters: redraw scaled copy of the text region
+    tmp = G(30, 5); _dt(tmp, 0, 0, 'CAMBIO', '&'); big = scale_up(tmp, 2)
+    neon = G(76, 22); neon.rect(0, 0, 75, 21, '#'); neon.rect(1, 1, 74, 20, '@'); neon.paste(big, 8, 6); neon.outline('K')
+    for x in range(4, 72, 8):
+        neon.set(x, 2, '*'); neon.set(x + 4, 19, '*')
+    add('deco_neon', neon)
+    table = G(48, 30); table.ellipse(24, 10, 23, 8, 'a'); table.ellipse(23, 9, 21, 6.5, 'A'); table.rect(8, 16, 11, 29, 'w'); table.rect(37, 16, 40, 29, 'w')
+    table.rect(14, 18, 34, 20, 'j'); table.outline('K'); P.prop_card(table, 14, 4, 'R'); P.prop_card(table, 26, 3, '1')
+    add('deco_table', table)
+    fl = G(22, 72); fl.rect(9, 12, 12, 71, '$'); fl.vline(9, 12, 71, '='); fl.rect(2, 0, 19, 11, '#'); fl.rect(3, 1, 18, 10, '$')
+    for x in range(4, 18, 4):
+        fl.rect(x, 2, x + 2, 4, 'L'); fl.rect(x, 6, x + 2, 8, 'L')
+    fl.outline('K'); add('deco_floodlight', fl)
+    st = G(96, 48)
+    for i in range(6):
+        y0 = i * 8
+        st.rect(0, y0, 95, y0 + 7, '$' if i % 2 == 0 else '@')
+        for x in range(2 + (i % 2) * 4, 96, 8):
+            st.rect(x, y0 + 2, x + 3, y0 + 5, ['R', 'O', 'R', 'O', 'R', '#'][(x // 8 + i) % 6])
+    st.outline('K'); add('deco_stand', st)
+    steam = G(14, 26)
+    for i, sx in enumerate((2, 6, 10)):
+        for y in range(2 + i * 3, 24, 2):
+            steam.set(sx + (y // 4) % 2, y, '=')
+    add('deco_steam', steam)
+    # --- hazards & platforms
+    pud = G(32, 8); pud.ellipse(16, 5, 15, 3.2, 'J'); pud.ellipse(14, 4.5, 11, 2, 'j'); pud.set(6, 4, '!'); pud.set(20, 3, '!'); pud.set(26, 5, '!'); pud.outline('K'); add('haz_puddle', pud)
+    vent = G(32, 10); vent.rect(0, 2, 31, 9, '$'); vent.rect(1, 3, 30, 8, '-')
+    for x in range(3, 30, 4):
+        vent.rect(x, 4, x + 1, 7, '#')
+    vent.outline('K'); add('haz_vent', vent)
+    pc = G(64, 16); pc.rect(0, 0, 63, 15, 'O'); pc.rect(2, 2, 61, 13, 'R'); pc.ellipse(32, 8, 8, 5, 'O'); pc.outline('K'); add('plat_card', pc)
+    pcb = G(64, 16); pcb.rect(0, 0, 63, 15, 'O'); pcb.rect(2, 2, 61, 13, '1'); pcb.ellipse(32, 8, 8, 5, 'O'); pcb.outline('K'); add('plat_card_back', pcb)
+    pm = G(64, 16); pm.rect(0, 0, 63, 15, '$'); pm.hline(1, 62, 1, '='); pm.rect(0, 12, 63, 15, '@')
+    for x in range(6, 60, 12):
+        pm.set(x, 6, '#'); pm.set(x + 1, 6, '#')
+    pm.outline('K'); add('plat_move', pm)
+    ball = scale_up(I.ball(), 1); add('haz_ball', ball)
+    drum = G(20, 16); drum.rect(2, 4, 17, 15, 'R'); drum.rect(2, 4, 17, 6, 'O'); drum.rect(2, 13, 17, 15, 'r'); drum.vline(6, 6, 13, 'O'); drum.vline(13, 6, 13, 'O'); drum.outline('K'); add('prop_drum', drum)
 
     if include_scenes:
         add('scene_barios', E.scene_barios()); add('scene_vfb', E.scene_vfb()); add('scene_arena', E.scene_arena())

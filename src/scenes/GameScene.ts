@@ -1,17 +1,20 @@
 import Phaser from 'phaser';
 import { T, GAME_H } from '../config/Tuning';
 import { InputSystem } from '../systems/Input';
-import { audio, TRACK_BOULEVARD } from '../systems/Audio';
+import { audio, TRACKS } from '../systems/Audio';
 import { save } from '../systems/Save';
 import { Player } from '../entities/Player';
-import { Mob } from '../entities/Mob';
+import { Mob, type Variant } from '../entities/Mob';
 import { Block } from '../entities/Block';
-import { Cup, Wave, HomingCard } from '../entities/Projectiles';
+import { Cup, Wave, HomingCard, Pacifier } from '../entities/Projectiles';
+import { Puddle, Vent, Ball, BallSpawner, CardPlatform, MovingPlatform } from '../entities/Hazards';
 import { LEVELS, nextLevel } from '../data/levels';
+import { worldOf } from '../data/worlds';
 import { FORMS, SPECIALS, isForm, isSpecial, type Form, type Special } from '../data/forms';
 
 type Obj = Phaser.Types.Tilemaps.TiledObject;
 type Overlay = { kind: 'result' | 'gameover'; lines: string[]; hint: string } | null;
+const prop = (o: Obj, name: string) => (((o as any).properties ?? []) as { name: string; value: unknown }[]).find((p) => p.name === name)?.value;
 
 export class GameScene extends Phaser.Scene {
   inputSys!: InputSystem;
@@ -21,17 +24,24 @@ export class GameScene extends Phaser.Scene {
   cards!: Phaser.Physics.Arcade.StaticGroup;
   checkpoints!: Phaser.Physics.Arcade.StaticGroup;
   solids!: Phaser.Physics.Arcade.StaticGroup;
+  puddles!: Phaser.Physics.Arcade.StaticGroup;
+  vents!: Phaser.Physics.Arcade.StaticGroup;
   blocks: Block[] = [];
   mobs: Mob[] = [];
   mobGroup!: Phaser.Physics.Arcade.Group;
   cups!: Phaser.Physics.Arcade.Group;
   homing!: Phaser.Physics.Arcade.Group;
   waves!: Phaser.Physics.Arcade.Group;
+  balls!: Phaser.Physics.Arcade.Group;
+  pacifiers!: Phaser.Physics.Arcade.Group;
+  movers!: Phaser.Physics.Arcade.Group;
   pickups!: Phaser.Physics.Arcade.Group;
+  spawners: BallSpawner[] = [];
   flag?: Phaser.Physics.Arcade.Image;
   dust!: Phaser.GameObjects.Particles.ParticleEmitter;
   sparks!: Phaser.GameObjects.Particles.ParticleEmitter;
   paint!: Phaser.GameObjects.Particles.ParticleEmitter;
+  steam!: Phaser.GameObjects.Particles.ParticleEmitter;
   levelKey = LEVELS[0].key;
   spawn = new Phaser.Math.Vector2(64, 200);
   respawnPoint = new Phaser.Math.Vector2(64, 200);
@@ -50,6 +60,7 @@ export class GameScene extends Phaser.Scene {
   specialUntil = 0;
   worldScale = 1;
   khusra = 0;
+  drumUntil = 0;
 
   constructor() { super('game'); }
 
@@ -65,40 +76,55 @@ export class GameScene extends Phaser.Scene {
     this.punchCombo = 0;
     this.special = null;
     this.worldScale = 1;
+    this.drumUntil = 0;
     this.blocks = [];
     this.mobs = [];
+    this.spawners = [];
     this.totalCards = 0;
     this.inputSys = new InputSystem(this);
+    const level = LEVELS.find((l) => l.key === this.levelKey) ?? LEVELS[0];
+    const theme = worldOf(level.world);
 
     // --- map
     this.map = this.make.tilemap({ key: this.levelKey });
-    const tiles = this.map.addTilesetImage('tiles', 'tiles')!;
+    const tiles = this.map.addTilesetImage('tiles', theme.tiles)!;
     if (this.map.getLayerIndexByName('back') !== null) this.map.createLayer('back', tiles, 0, 0);
     this.ground = this.map.createLayer('ground', tiles, 0, 0)!;
     this.ground.setCollisionByExclusion([-1]);
     this.physics.world.setBounds(0, 0, this.map.widthInPixels, this.map.heightInPixels + 600);
     const groundTop = this.findGroundTop();
 
-    // --- background: far pink hills, near green hills, clouds (parallax)
+    // --- background: horizon glow, far/near hills, clouds, world decor (parallax)
     const W = this.map.widthInPixels;
-    for (let x = -60; x < W * 0.7 + 200; x += 150) this.add.image(x, groundTop + 6, 'spr', 'hill_far_0').setOrigin(0.5, 1).setScrollFactor(0.3, 0.92).setDepth(-8).setAlpha(0.55);
-    for (let x = 0; x < W * 0.85 + 200; x += 118) this.add.image(x + (x % 3) * 9, groundTop + 2, 'spr', 'hill_0').setOrigin(0.5, 1).setScrollFactor(0.55, 0.95).setDepth(-6).setAlpha(0.8);
-    for (let i = 0; i < Math.ceil(W / 240); i++) this.add.image(i * 240 + (i % 3) * 40, 34 + (i % 4) * 24, 'spr', 'cloud_0').setScrollFactor(0.4, 0.9).setDepth(-5).setAlpha(0.9);
+    this.add.rectangle(0, groundTop - 36, W * 2, 90, Phaser.Display.Color.HexStringToColor(theme.horizon).color, 0.55).setOrigin(0, 0.5).setScrollFactor(0.15, 0.95).setDepth(-9);
+    for (let x = -60; x < W * 0.7 + 200; x += 150) this.add.image(x, groundTop + 6, 'spr', 'hill_far_0').setOrigin(0.5, 1).setScrollFactor(0.3, 0.92).setDepth(-8).setAlpha(theme.hillFarAlpha).setTint(theme.hillFarTint);
+    for (let x = 0; x < W * 0.85 + 200; x += 118) this.add.image(x + (x % 3) * 9, groundTop + 2, 'spr', 'hill_0').setOrigin(0.5, 1).setScrollFactor(0.55, 0.95).setDepth(-6).setAlpha(0.8).setTint(theme.hillNearTint);
+    for (let i = 0; i < Math.ceil(W / 240); i++) this.add.image(i * 240 + (i % 3) * 40, 34 + (i % 4) * 24, 'spr', 'cloud_0').setScrollFactor(0.4, 0.9).setDepth(-5).setAlpha(theme.cloudAlpha);
+    theme.ambient.forEach((a, ai) => {
+      for (let x = a.every / 2 + ai * 70; x < W * a.scroll + 300; x += a.every) {
+        this.add.image(x, groundTop + a.yOff, 'spr', a.frame).setOrigin(0.5, 1).setScrollFactor(a.scroll, 0.97).setDepth(-4 + ai * 0.1).setAlpha(a.alpha).setScale(a.scale ?? 1);
+      }
+    });
 
     // --- groups. Dynamic groups get their `defaults` cleared: otherwise add() resets velocity/gravity of
     // pre-configured children. Plain groups are no alternative - the Arcade RTree lookup skips them.
     this.cards = this.physics.add.staticGroup();
     this.checkpoints = this.physics.add.staticGroup();
     this.solids = this.physics.add.staticGroup();
+    this.puddles = this.physics.add.staticGroup();
+    this.vents = this.physics.add.staticGroup();
     this.mobGroup = this.dynGroup();
     this.cups = this.dynGroup();
     this.homing = this.dynGroup();
     this.waves = this.dynGroup();
+    this.balls = this.dynGroup();
+    this.pacifiers = this.dynGroup();
+    this.movers = this.dynGroup();
     this.pickups = this.physics.add.group();
 
     // --- objects
     const objs = (this.map.getObjectLayer('objects')?.objects ?? []) as Obj[];
-    const mobDefs: [number, number][] = [];
+    const mobDefs: [number, number, Variant][] = [];
     for (const o of objs) {
       const type = (o as any).type || (o as any).class || o.name;
       const x = o.x ?? 0, y = o.y ?? 0;
@@ -111,6 +137,7 @@ export class GameScene extends Phaser.Scene {
           c.setData('value', type === 'royal' ? 10 : 1).setData('royal', type === 'royal').setDepth(4);
           (c.body as Phaser.Physics.Arcade.StaticBody).setSize(18, 22).setOffset(3, 1);
           this.tweens.add({ targets: c, y: y - 4, duration: 520 + ((x / 32) % 4) * 70, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+          if (type === 'royal') this.tweens.add({ targets: c, angle: 8, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
           this.totalCards += type === 'royal' ? 10 : 1;
           break;
         }
@@ -126,8 +153,7 @@ export class GameScene extends Phaser.Scene {
           break;
         }
         case 'block': {
-          const props = ((o as any).properties ?? []) as { name: string; value: string }[];
-          const contents = props.find((p) => p.name === 'contents')?.value ?? 'card';
+          const contents = (prop(o, 'contents') as string) ?? 'card';
           const b = new Block(this, x, y, contents);
           b.onSpawn = (blk, what) => this.spawnFromBlock(blk, what);
           this.blocks.push(b);
@@ -141,7 +167,13 @@ export class GameScene extends Phaser.Scene {
           p.refreshBody();
           break;
         }
-        case 'mob': mobDefs.push([x, y]); break;
+        case 'mob': mobDefs.push([x, y, ((prop(o, 'variant') as Variant) ?? 'basic')]); break;
+        case 'puddle': this.puddles.add(new Puddle(this, x, y)); break;
+        case 'vent': this.vents.add(new Vent(this, x, y)); break;
+        case 'ballspawner': this.spawners.push(new BallSpawner(x, y, T.BALL_EVERY)); this.add.image(x, y, 'spr', 'haz_ball_0').setAlpha(0.35).setDepth(-1); break;
+        case 'cardplat': this.solids.add(new CardPlatform(this, x, y, (prop(o, 'phase') as number) ?? 0)); break;
+        case 'moveplat': this.movers.add(new MovingPlatform(this, x, y, 96, 60, !!prop(o, 'vertical'))); break;
+        case 'deco': this.add.image(x, y, 'spr', (prop(o, 'frame') as string) ?? 'bush_0').setOrigin(0.5, 1).setDepth(-1); break;
         case 'bush': this.add.image(x, y, 'spr', 'bush_0').setOrigin(0.5, 1).setDepth(-1); break;
         case 'palm': this.add.image(x, y, 'spr', 'palm_0').setOrigin(0.45, 1).setDepth(-1); break;
         case 'sign': this.add.image(x, y, 'spr', 'sign_0').setOrigin(0.5, 1).setDepth(-1); break;
@@ -162,6 +194,10 @@ export class GameScene extends Phaser.Scene {
       frame: 'fx_dust_0', speed: { min: 40, max: 120 }, lifespan: { min: 250, max: 500 }, gravityY: 200,
       scale: { start: 1.2, end: 0.4 }, alpha: { start: 1, end: 0 }, tint: [0xff4fa3, 0xf4c6d8, 0xffe7f2], quantity: 10, emitting: false,
     }).setDepth(12);
+    this.steam = this.add.particles(0, 0, 'spr', {
+      frame: 'fx_dust_0', speedY: { min: -160, max: -60 }, speedX: { min: -20, max: 20 }, lifespan: { min: 300, max: 600 },
+      scale: { start: 1.4, end: 0.3 }, alpha: { start: 0.7, end: 0 }, quantity: 4, emitting: false,
+    }).setDepth(9);
 
     // --- player
     this.player = new Player(this, this.spawn.x, this.spawn.y);
@@ -173,9 +209,11 @@ export class GameScene extends Phaser.Scene {
     this.player.onAttack = (form, x, y, dir) => this.attack(form, x, y, dir);
 
     // --- mobs
-    for (const [x, y] of mobDefs) {
-      const m = new Mob(this, x, y, this.ground, save.settings.assist ? 0.7 : 1);
+    for (const [x, y, variant] of mobDefs) {
+      const m = new Mob(this, x, y, this.ground, save.settings.assist ? 0.7 : 1, variant);
       m.onShout = (sx, sy, dir) => this.waves.add(new Wave(this, sx, sy, dir, 'mob'));
+      m.onThrow = (sx, sy, vx, vy) => this.pacifiers.add(new Pacifier(this, sx, sy, vx, vy));
+      m.onDrum = () => this.drumBeat();
       this.mobs.push(m);
       this.mobGroup.add(m);
     }
@@ -183,15 +221,25 @@ export class GameScene extends Phaser.Scene {
     // --- collisions
     this.physics.add.collider(this.player, this.ground);
     this.physics.add.collider(this.player, this.solids, (_p, s) => this.onSolid(s as Phaser.Physics.Arcade.Image));
+    this.physics.add.collider(this.player, this.movers);
     this.physics.add.collider(this.mobGroup, this.ground);
     this.physics.add.collider(this.mobGroup, this.solids);
+    this.physics.add.collider(this.mobGroup, this.movers);
     this.physics.add.collider(this.pickups, this.ground);
     this.physics.add.collider(this.pickups, this.solids);
+    this.physics.add.collider(this.balls, this.ground);
+    this.physics.add.collider(this.balls, this.solids);
+    this.physics.add.collider(this.pacifiers, this.ground, (p) => this.breakSmall(p as Phaser.Physics.Arcade.Sprite));
+    this.physics.add.collider(this.pacifiers, this.solids, (p) => this.breakSmall(p as Phaser.Physics.Arcade.Sprite));
     this.physics.add.overlap(this.player, this.cards, (_p, c) => this.collect(c as Phaser.Physics.Arcade.Sprite));
     this.physics.add.overlap(this.player, this.checkpoints, (_p, c) => this.hitCheckpoint(c as Phaser.Physics.Arcade.Sprite));
     this.physics.add.overlap(this.player, this.mobGroup, (_p, m) => this.playerVsMob(m as Mob));
     this.physics.add.overlap(this.player, this.waves, (_p, w) => this.playerVsWave(w as Wave));
     this.physics.add.overlap(this.player, this.pickups, (_p, k) => this.collectPickup(k as Phaser.Physics.Arcade.Sprite));
+    this.physics.add.overlap(this.player, this.puddles, () => this.playerVsPuddle());
+    this.physics.add.overlap(this.player, this.vents, (_p, v) => this.playerVsVent(v as Vent));
+    this.physics.add.overlap(this.player, this.balls, (_p, b) => this.playerVsBall(b as Ball));
+    this.physics.add.overlap(this.player, this.pacifiers, (_p, k) => this.playerVsPacifier(k as Pacifier));
     this.physics.add.overlap(this.cups, this.mobGroup, (c, m) => this.projectileVsMob(c as Phaser.Physics.Arcade.Sprite, m as Mob));
     this.physics.add.overlap(this.homing, this.mobGroup, (c, m) => this.projectileVsMob(c as Phaser.Physics.Arcade.Sprite, m as Mob));
     this.physics.add.overlap(this.waves, this.mobGroup, (w, m) => this.waveVsMob(w as Wave, m as Mob));
@@ -203,7 +251,7 @@ export class GameScene extends Phaser.Scene {
     // --- camera
     const cam = this.cameras.main;
     cam.setBounds(0, 0, this.map.widthInPixels, Math.max(this.map.heightInPixels, GAME_H));
-    cam.setBackgroundColor('#FFC2DC');
+    cam.setBackgroundColor(theme.sky);
     cam.startFollow(this.player, true, T.CAM_LERP, T.CAM_LERP);
     cam.setDeadzone(T.CAM_DEADZONE_W, T.CAM_DEADZONE_H);
     this.applyZoom();
@@ -221,11 +269,10 @@ export class GameScene extends Phaser.Scene {
     if (!this.registry.has('lives')) this.registry.set('lives', 3);
     if (!this.registry.has('hearts') || this.registry.get('hearts') <= 0 || this.registry.get('hearts') > maxHearts) this.registry.set('hearts', maxHearts);
     this.startTime = this.time.now;
-    audio.play(TRACK_BOULEVARD);
+    audio.play(TRACKS[theme.track]);
     this.game.events.on(Phaser.Core.Events.HIDDEN, this.onHidden, this);
     this.events.once('shutdown', () => this.game.events.off(Phaser.Core.Events.HIDDEN, this.onHidden, this));
-    const def = LEVELS.find((l) => l.key === this.levelKey);
-    this.events.emit('msg', def ? def.name : '', 1400);
+    this.events.emit('msg', level.name, 1500);
     this.events.emit('overlay', null);
     this.input.on('pointerdown', this.onTapOverlay, this);
     this.input.keyboard?.on('keydown-SPACE', this.onTapOverlay, this);
@@ -345,7 +392,6 @@ export class GameScene extends Phaser.Scene {
   // ------------------------------------------------------------ attacks
   /** Returns the cooldown in ms when an attack happened, 0 when nothing fired. */
   attack(form: Form, x: number, y: number, dir: number): number {
-    // Ultimate first: a full meter fires KHUSRA MUND from any form
     if (this.khusra >= 100) { this.khusraMund(); return 600; }
     if (this.special === 'cambio') {
       audio.throw();
@@ -384,13 +430,23 @@ export class GameScene extends Phaser.Scene {
       (dir > 0 ? m.body.left >= p.center.x - 6 && m.body.left <= p.right + range : m.body.right <= p.center.x + 6 && m.body.right >= p.left - range));
   }
 
+  /** Damage a mob from a direction; handles the Schal shield and Fan-Block members. Heavy hits ignore both. */
+  private hitMob(m: Mob, dir: number, heavy: boolean) {
+    if (!m.alive) return false;
+    if (m.blocksFrom(dir) && !heavy) { this.sparks.emitParticleAt(m.x + m.dir * 14, m.y - 30, 4); audio.bump(); return false; }
+    if (m.variant === 'fanblock' && !heavy) { m.loseMember(); this.sparks.emitParticleAt(m.x, m.y - 30, 6); if (!m.alive) this.addKhusra(T.KHUSRA_KILL); return true; }
+    m.kill();
+    this.addKhusra(T.KHUSRA_KILL);
+    this.sparks.emitParticleAt(m.x, m.y - 30, 8);
+    return true;
+  }
+
   private punch(dir: number, combo: boolean) {
     const now = this.time.now;
     audio.punch();
     const pb = this.player.body;
     const px = pb.center.x + dir * (T.PUNCH_RANGE * 0.6), py = pb.center.y;
     this.dust.emitParticleAt(px, py, 3);
-    // bricks: Sport-Suchti smashes them (probe two reaches, two heights)
     if (!combo) {
       const seen = new Set<Phaser.Tilemaps.Tile>();
       for (const reach of [pb.halfWidth + 6, pb.halfWidth + 24]) {
@@ -402,17 +458,20 @@ export class GameScene extends Phaser.Scene {
     }
     for (const m of this.mobsInFront(dir, T.PUNCH_RANGE)) {
       if (combo) {
+        if (m.blocksFrom(dir)) { this.sparks.emitParticleAt(m.x + m.dir * 14, m.y - 30, 4); audio.bump(); continue; }
         this.punchCombo = now < this.punchComboUntil ? this.punchCombo + 1 : 1;
         this.punchComboUntil = now + T.COMBO_WINDOW_PUNCH;
-        if (this.punchCombo >= 3) { this.punchCombo = 0; m.fling(dir); this.events.emit('msg', 'ABFLUG!', 600); }
-        else m.push(dir, 40, -60);
+        if (this.punchCombo >= 3) {
+          this.punchCombo = 0;
+          if (m.variant === 'fanblock') { m.loseMember(); if (!m.alive) this.addKhusra(T.KHUSRA_KILL); }
+          else { m.fling(dir); this.events.emit('msg', 'ABFLUG!', 600); }
+        } else m.push(dir, 40, -60);
         this.sparks.emitParticleAt(m.x, m.y - 30, 4);
       } else {
-        m.kill(); this.addKhusra(T.KHUSRA_KILL); this.sparks.emitParticleAt(m.x, m.y - 30, 8);
+        this.hitMob(m, dir, false);
       }
       this.hitstop();
     }
-    // blocks in front
     for (const b of this.blocks) {
       if (Math.abs(b.y - py) < 40 && (dir > 0 ? b.x - px > -8 && b.x - px < T.PUNCH_RANGE : px - b.x > -8 && px - b.x < T.PUNCH_RANGE)) b.bump();
     }
@@ -429,8 +488,7 @@ export class GameScene extends Phaser.Scene {
   private spray(dir: number) {
     audio.spray();
     const p = this.player.body;
-    const s = this.add.image(p.center.x + dir * 22, p.center.y - 8, 'spr', 'fx_spray_0').setOrigin(0, 0.5).setDepth(11).setFlipX(dir < 0);
-    if (dir < 0) s.setOrigin(1, 0.5);
+    const s = this.add.image(p.center.x + dir * 22, p.center.y - 8, 'spr', 'fx_spray_0').setOrigin(dir < 0 ? 1 : 0, 0.5).setDepth(11).setFlipX(dir < 0);
     this.tweens.add({ targets: s, alpha: 0, scaleX: 1.3, duration: 320, onComplete: () => s.destroy() });
     for (const m of this.mobsInFront(dir, T.SPRAY_RANGE, 44)) {
       m.confuse(T.CONFUSE_MS);
@@ -453,7 +511,7 @@ export class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: ring, scale: T.CHORD_RADIUS / 22, alpha: 0, duration: 380, ease: 'Quad.out', onComplete: () => ring.destroy() });
     this.cameras.main.shake(180, 0.008);
     for (const m of this.mobs) {
-      if (m.alive && Phaser.Math.Distance.Between(p.center.x, p.center.y, m.x, m.y) < T.CHORD_RADIUS) { m.kill(); this.addKhusra(T.KHUSRA_KILL); this.sparks.emitParticleAt(m.x, m.y - 30, 8); }
+      if (m.alive && Phaser.Math.Distance.Between(p.center.x, p.center.y, m.x, m.y) < T.CHORD_RADIUS) this.hitMob(m, Math.sign(m.x - p.center.x) || 1, true);
     }
     for (const b of this.blocks) if (Phaser.Math.Distance.Between(p.center.x, p.center.y, b.x, b.y) < T.CHORD_RADIUS) b.bump();
     const r = T.CHORD_RADIUS;
@@ -482,8 +540,17 @@ export class GameScene extends Phaser.Scene {
       if (m.alive && view.contains(m.x, m.y - 20)) { m.kill(); this.sparks.emitParticleAt(m.x, m.y - 30, 10); }
     }
     this.waves.getChildren().slice().forEach((w) => { if ((w as Wave).owner === 'mob') w.destroy(); });
+    this.pacifiers.getChildren().slice().forEach((k) => k.destroy());
+    this.balls.getChildren().slice().forEach((b) => b.destroy());
     this.events.emit('msg', 'KHUSRA MUND!', 900);
     this.hitstop();
+  }
+
+  /** Trommler beat: every mob on screen gets a short speed burst. */
+  drumBeat() {
+    this.drumUntil = this.time.now + 420;
+    audio.bump();
+    this.cameras.main.shake(60, 0.002);
   }
 
   // ------------------------------------------------------------ cards
@@ -506,7 +573,7 @@ export class GameScene extends Phaser.Scene {
     const royal = !!c.getData('royal');
     const ghost = this.add.image(c.x, c.y, 'spr', c.frame.name).setDepth(12);
     this.tweens.add({ targets: ghost, y: c.y - 26, alpha: 0, scale: 1.4, duration: 240, ease: 'Quad.out', onComplete: () => ghost.destroy() });
-    if (royal) { this.registry.inc('royals', 1); this.sparks.emitParticleAt(c.x, c.y, 12); }
+    if (royal) { this.registry.inc('royals', 1); this.sparks.emitParticleAt(c.x, c.y, 12); this.events.emit('msg', 'ROYAL!', 700); }
     c.destroy();
     this.bankCards(v, c.x, c.y, royal);
   }
@@ -526,12 +593,18 @@ export class GameScene extends Phaser.Scene {
     const p = this.player.body;
     const stomp = p.velocity.y > 0 && p.bottom < m.body.top + 18;
     if (stomp) {
-      m.kill();
-      this.addKhusra(T.KHUSRA_KILL);
-      this.player.bounce();
+      if (m.variant === 'fanblock') {
+        this.player.bounce();
+        m.push(Math.sign(m.x - this.player.x) || 1, 30, -40);
+        this.events.emit('msg', 'VON DER SEITE!', 500);
+      } else {
+        m.kill();
+        this.addKhusra(T.KHUSRA_KILL);
+        this.player.bounce();
+        this.registry.inc('stomps', 1);
+      }
       this.hitstop();
       this.dust.emitParticleAt(m.x, m.body.top, 6);
-      this.registry.inc('stomps', 1);
     } else if (m.state !== 'stunned') {
       this.damagePlayer(Math.sign(this.player.x - m.x) || 1);
     }
@@ -542,9 +615,47 @@ export class GameScene extends Phaser.Scene {
     if (this.damagePlayer(w.dir)) w.destroy();
   }
 
+  playerVsPuddle() {
+    if (this.player.dead || this.finished || this.player.invulnerable) return;
+    if (this.damagePlayer(-this.player.facing || 1)) this.player.body.setVelocityY(-T.KNOCKBACK_Y * 1.1);
+  }
+
+  playerVsVent(v: Vent) {
+    const b = this.player.body;
+    if (b.velocity.y > -T.VENT_LIFT * 0.9) {
+      b.setVelocityY(Math.max(-T.VENT_LIFT, b.velocity.y - 90));
+      this.player.jumping = false;
+    }
+    if (this.time.now % 90 < 20) this.steam.emitParticleAt(v.x + Phaser.Math.Between(-10, 10), b.bottom, 2);
+  }
+
+  playerVsBall(b: Ball) {
+    if (this.player.dead || this.finished) return;
+    const p = this.player.body;
+    if (p.velocity.y > 0 && p.bottom < b.body.top + 12) {
+      b.body.setVelocity(this.player.facing * 260, -220);
+      this.player.bounce();
+      audio.bump();
+      this.sparks.emitParticleAt(b.x, b.y, 4);
+    } else {
+      this.damagePlayer(Math.sign(this.player.x - b.x) || 1);
+    }
+  }
+
+  playerVsPacifier(k: Pacifier) {
+    if (this.player.dead || this.finished) return;
+    if (this.damagePlayer(Math.sign(k.body.velocity.x) || 1)) this.breakSmall(k);
+  }
+
+  breakSmall(k: Phaser.Physics.Arcade.Sprite) {
+    this.dust.emitParticleAt(k.x, k.y, 4);
+    k.destroy();
+  }
+
   waveVsMob(w: Wave, m: Mob) {
     if (w.owner !== 'player' || !m.alive || w.hit.has(m)) return;
     w.hit.add(m);
+    if (m.variant === 'fanblock') { m.loseMember(); this.sparks.emitParticleAt(m.x, m.y - 30, 4); return; }
     m.push(w.dir, T.DJ_PUSH * w.strength);
     this.sparks.emitParticleAt(m.x, m.y - 30, 4);
   }
@@ -556,8 +667,8 @@ export class GameScene extends Phaser.Scene {
 
   projectileVsMob(c: Phaser.Physics.Arcade.Sprite, m: Mob) {
     if (!m.alive) return;
-    m.kill();
-    this.addKhusra(T.KHUSRA_KILL);
+    const dir = Math.sign(c.body?.velocity.x ?? 1) || 1;
+    this.hitMob(m, dir, false);
     this.sparks.emitParticleAt(c.x, c.y, 6);
     c.destroy();
     this.hitstop();
@@ -647,7 +758,7 @@ export class GameScene extends Phaser.Scene {
       this.physics.world.pause();
       this.overlay = {
         kind: 'result',
-        lines: ['CAMBIO!', '', `KARTEN   ${cards} / ${this.totalCards}`, `ZEIT     ${secs.toFixed(1)}s${newBest ? '  NEU!' : ''}`, noDmg ? 'OHNE SCHADEN  +500' : ''],
+        lines: ['CAMBIO!', '', `KARTEN   ${cards} / ${this.totalCards}`, `ZEIT     ${secs.toFixed(1)}s${newBest ? '  NEU!' : ''}`, noDmg ? 'OHNE SCHADEN  +500' : royals ? `ROYALS   ${royals}` : ''],
         hint: 'TIPPEN FUER WEITER',
       };
       this.events.emit('overlay', this.overlay);
@@ -691,13 +802,33 @@ export class GameScene extends Phaser.Scene {
 
     const now = this.time.now;
     if (this.special && now > this.specialUntil) this.endSpecial();
+
+    // mob buffs: Fahnentraeger aura + Trommler beat
+    const drum = now < this.drumUntil;
+    for (const m of this.mobs) m.buff = drum ? T.DRUM_BUFF : 1;
+    for (const f of this.mobs) {
+      if (f.variant !== 'fahne' || !f.alive) continue;
+      for (const m of this.mobs) if (m !== f && m.alive && Phaser.Math.Distance.Between(f.x, f.y, m.x, m.y) < T.FAHNE_RADIUS) m.buff = Math.max(m.buff, T.FAHNE_BUFF);
+    }
     for (const m of this.mobs) {
       m.update(dt, this.player, this.worldScale);
       if (m.alive && m.y > this.map.heightInPixels + 60) { m.kill(); this.addKhusra(T.KHUSRA_KILL); }
     }
+    // ball spawners (World 4)
+    const view = this.cameras.main.worldView;
+    for (const s of this.spawners) {
+      if (now > s.next && view.contains(s.x, s.y)) {
+        s.next = now + s.every * (this.worldScale < 1 ? 2 : 1);
+        this.balls.add(new Ball(this, s.x, s.y, this.player.x < s.x ? -1 : 1));
+        audio.bump();
+      }
+    }
+    this.movers.getChildren().forEach((p) => (p as MovingPlatform).tick());
     this.cups.getChildren().slice().forEach((c) => { const cup = c as Cup; if (cup.expired(now) || cup.y > this.map.heightInPixels + 50) cup.destroy(); });
     this.homing.getChildren().slice().forEach((c) => { const hc = c as HomingCard; hc.steer(dt); if (hc.expired(now)) hc.destroy(); });
     this.waves.getChildren().slice().forEach((w) => { const wave = w as Wave; if (wave.expired(now)) wave.destroy(); });
+    this.balls.getChildren().slice().forEach((b) => { const ball = b as Ball; if (ball.expired(now) || ball.y > this.map.heightInPixels + 50) ball.destroy(); });
+    this.pacifiers.getChildren().slice().forEach((k) => { const pk = k as Pacifier; if (pk.expired(now) || pk.y > this.map.heightInPixels + 50) pk.destroy(); });
     if (now > this.comboUntil && this.combo) { this.combo = 0; this.registry.set('combo', 0); }
     if (now > this.punchComboUntil) this.punchCombo = 0;
 

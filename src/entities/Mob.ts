@@ -3,6 +3,16 @@ import { T } from '../config/Tuning';
 import { audio } from '../systems/Audio';
 
 type State = 'patrol' | 'notice' | 'run' | 'attack' | 'cooldown' | 'stunned' | 'flung' | 'dead';
+export type Variant = 'basic' | 'nuckel' | 'schal' | 'fahne' | 'trommler' | 'fanblock';
+
+export const VARIANT_INFO: Record<Variant, { prop: string | null; tint: number; name: string }> = {
+  basic: { prop: null, tint: 0xffffff, name: 'MEISTERSAGER' },
+  nuckel: { prop: 'it_nuckel_0', tint: 0xcfe6ff, name: 'NJUCKEL-WERFER' },
+  schal: { prop: 'it_schal_0', tint: 0xffd6d6, name: 'SCHAL-SCHWINGER' },
+  fahne: { prop: 'it_fahne_0', tint: 0xffffff, name: 'FAHNENTRAEGER' },
+  trommler: { prop: 'prop_drum_0', tint: 0xfff0c0, name: 'TROMMLER' },
+  fanblock: { prop: null, tint: 0xffffff, name: 'FAN-BLOCK' },
+};
 
 /** Der Meistersager – the one and only mob. Patrols, notices you, runs, shouts MEITHHTER!, gets stomped, becomes an angel. */
 export class Mob extends Phaser.Physics.Arcade.Sprite {
@@ -15,25 +25,49 @@ export class Mob extends Phaser.Physics.Arcade.Sprite {
   spawnY: number;
   ground: Phaser.Tilemaps.TilemapLayer;
   onShout?: (x: number, y: number, dir: number) => void;
+  onThrow?: (x: number, y: number, vx: number, vy: number) => void;
+  onDrum?: () => void;
   speedMul = 1;
+  /** temporary buff from a Fahnentraeger / Trommler beat */
+  buff = 1;
+  variant: Variant = 'basic';
+  prop?: Phaser.GameObjects.Image;
+  members = 1;
+  extra: Phaser.GameObjects.Sprite[] = [];
   /** confused (sprayed): walks the wrong way, slower */
   confusedUntil = 0;
   flungUntil = 0;
   private paintTint = false;
 
-  constructor(scene: Phaser.Scene, x: number, groundY: number, ground: Phaser.Tilemaps.TilemapLayer, speedMul = 1) {
+  constructor(scene: Phaser.Scene, x: number, groundY: number, ground: Phaser.Tilemaps.TilemapLayer, speedMul = 1, variant: Variant = 'basic') {
     super(scene, x, groundY - 26, 'spr', 'meister_idle_0');
     this.speedMul = speedMul;
+    this.variant = variant;
     this.ground = ground;
     this.spawnX = x; this.spawnY = groundY;
     scene.add.existing(this);
     scene.physics.add.existing(this);
     this.setVisible(false);
-    this.body.setSize(24, 50).setOffset(12, 8);
+    this.members = variant === 'fanblock' ? 3 : 1;
+    this.body.setSize(24 * this.members, 50).setOffset(12 - 12 * (this.members - 1), 8);
     this.body.setGravityY(T.GRAVITY);
     this.body.setMaxVelocityY(T.TERMINAL_V);
     this.gfx = scene.add.sprite(x, groundY, 'spr', 'meister_idle_0').setOrigin(0.5, 58 / 64).setDepth(8);
     this.gfx.play('meister_walk');
+    const info = VARIANT_INFO[variant];
+    if (info.tint !== 0xffffff) this.gfx.setTint(info.tint);
+    if (info.prop) this.prop = scene.add.image(x, groundY, 'spr', info.prop).setDepth(9).setScale(variant === 'fahne' ? 1 : 0.8);
+    for (let i = 1; i < this.members; i++) {
+      const e = scene.add.sprite(x, groundY, 'spr', 'meister_idle_0').setOrigin(0.5, 58 / 64).setDepth(8 - i * 0.01);
+      e.play('meister_walk');
+      this.extra.push(e);
+    }
+    if (variant === 'trommler') { this.state = 'cooldown'; this.timer = 1200; }
+  }
+
+  /** Where damage from a projectile/punch is blocked: Schal-Schwinger blocks the front side. */
+  blocksFrom(dirOfAttack: number) {
+    return this.variant === 'schal' && this.alive && this.state !== 'stunned' && dirOfAttack === -this.dir;
   }
 
   get alive() { return this.state !== 'dead'; }
@@ -55,7 +89,8 @@ export class Mob extends Phaser.Physics.Arcade.Sprite {
     this.timer -= sdt * 1000;
     const grounded = b.blocked.down;
     const conf = this.confused;
-    const mul = this.speedMul * worldScale * (conf ? 0.5 : 1);
+    const mul = this.speedMul * worldScale * (conf ? 0.5 : 1) * this.buff;
+    const keepDist = this.variant === 'nuckel' ? 150 : 0;
     if (conf !== this.paintTint) { this.paintTint = conf; if (conf) this.gfx.setTint(0xff9ec9); else this.gfx.clearTint(); }
 
     switch (this.state) {
@@ -74,21 +109,33 @@ export class Mob extends Phaser.Physics.Arcade.Sprite {
         break;
       case 'run':
         this.dir = (Math.sign(dx) || this.dir) * (conf ? -1 : 1);
-        if (grounded && this.ledgeAhead()) b.setVelocityX(0);
+        if (keepDist && adx < keepDist) b.setVelocityX(0);               // Nuckel-Werfer keeps his distance
+        else if (grounded && this.ledgeAhead()) b.setVelocityX(0);
         else b.setVelocityX(this.dir * T.MOB_RUN * mul);
-        if (!conf && adx < T.MOB_ATTACK_RANGE && ady < 70) { this.state = 'attack'; this.timer = T.MOB_TELEGRAPH; b.setVelocityX(0); }
+        if (!conf && ady < 70 && (keepDist ? adx < keepDist + 40 : adx < T.MOB_ATTACK_RANGE)) { this.state = 'attack'; this.timer = T.MOB_TELEGRAPH; b.setVelocityX(0); }
         else if (adx > T.MOB_LOSE || player.dead || conf) this.state = 'patrol';
         break;
       case 'attack':
         b.setVelocityX(0);
         if (this.timer <= 0) {
-          audio.shout();
-          this.onShout?.(this.x + this.dir * 16, b.center.y - 4, this.dir);
-          this.state = 'cooldown'; this.timer = 1100;
+          if (this.variant === 'nuckel') {
+            audio.throw();
+            const vx = Math.sign(dx) * Math.min(260, 120 + adx * 0.9), vy = -260 - Math.max(0, -(player.y - this.y)) * 1.5;
+            this.onThrow?.(this.x + this.dir * 12, b.center.y - 10, vx, vy);
+          } else {
+            audio.shout();
+            this.onShout?.(this.x + this.dir * 16, b.center.y - 4, this.dir);
+          }
+          this.state = 'cooldown'; this.timer = this.variant === 'nuckel' ? 1600 : 1100;
         }
         break;
       case 'cooldown':
         b.setVelocityX(0);
+        if (this.variant === 'trommler') {
+          if (this.timer <= 0) { this.timer = 1200; this.onDrum?.(); this.scene.tweens.add({ targets: [this.gfx, this.prop].filter(Boolean), scaleY: 0.85, duration: 80, yoyo: true }); }
+          this.dir = Math.sign(dx) || this.dir;
+          break;
+        }
         if (this.timer <= 0) this.state = adx < T.MOB_LOSE && !player.dead ? 'run' : 'patrol';
         break;
       case 'stunned':
@@ -105,6 +152,35 @@ export class Mob extends Phaser.Physics.Arcade.Sprite {
     }
     if (this.state !== 'flung') this.animate();
     this.gfx.setPosition(Math.round(b.center.x), Math.round(b.bottom));
+    this.syncExtras();
+  }
+
+  private syncExtras() {
+    const b = this.body;
+    const cx = Math.round(b.center.x), by = Math.round(b.bottom);
+    if (this.members > 1) {
+      const w = 24;
+      this.gfx.setPosition(cx - w * (this.members - 1) / 2, by);
+      this.extra.forEach((e, i) => { e.setPosition(cx - w * (this.members - 1) / 2 + w * (i + 1), by).setFlipX(this.gfx.flipX); if (e.anims.currentAnim?.key !== this.gfx.anims.currentAnim?.key && this.gfx.anims.currentAnim) e.play(this.gfx.anims.currentAnim.key, true); });
+    }
+    if (this.prop) {
+      const v = this.variant;
+      if (v === 'fahne') this.prop.setPosition(cx - this.dir * 14, by - 46).setFlipX(this.dir < 0);
+      else if (v === 'trommler') this.prop.setPosition(cx + this.dir * 16, by - 8).setFlipX(this.dir < 0);
+      else if (v === 'schal') this.prop.setPosition(cx, by - 40);
+      else if (v === 'nuckel') this.prop.setPosition(cx + this.dir * 8, by - 44);
+    }
+  }
+
+  /** Fan-Block: one member falls per side hit. Returns true when the whole block is gone. */
+  loseMember() {
+    if (this.members <= 1) { this.kill(); return true; }
+    this.members--;
+    const e = this.extra.pop();
+    if (e) { this.scene.tweens.add({ targets: e, y: e.y - 60, alpha: 0, angle: 180, duration: 600, onComplete: () => e.destroy() }); }
+    this.body.setSize(24 * this.members, 50).setOffset(12 - 12 * (this.members - 1), 8);
+    audio.stomp();
+    return false;
   }
 
   private animate() {
@@ -160,6 +236,8 @@ export class Mob extends Phaser.Physics.Arcade.Sprite {
     this.body.enable = false;
     this.body.setVelocity(0, 0);
     audio.stomp();
+    this.prop?.setVisible(false);
+    this.extra.forEach((e) => e.setVisible(false));
     const g = this.gfx;
     g.anims.stop();
     g.clearTint();
@@ -185,5 +263,16 @@ export class Mob extends Phaser.Physics.Arcade.Sprite {
     this.gfx.setVisible(true).setAlpha(0).setScale(1, 1).setAngle(0).setOrigin(0.5, 58 / 64).setPosition(this.spawnX, this.spawnY);
     this.scene.tweens.add({ targets: this.gfx, alpha: 1, duration: 300 });
     this.gfx.play('meister_walk');
+    const info = VARIANT_INFO[this.variant];
+    if (info.tint !== 0xffffff) this.gfx.setTint(info.tint);
+    this.prop?.setVisible(true);
+    if (this.variant === 'fanblock') {
+      this.members = 3;
+      this.extra.forEach((e) => e.destroy());
+      this.extra = [];
+      for (let i = 1; i < 3; i++) { const e = this.scene.add.sprite(this.spawnX, this.spawnY, 'spr', 'meister_idle_0').setOrigin(0.5, 58 / 64).setDepth(8 - i * 0.01); e.play('meister_walk'); this.extra.push(e); }
+      this.body.setSize(72, 50).setOffset(-12, 8);
+    }
+    if (this.variant === 'trommler') { this.state = 'cooldown'; this.timer = 1200; }
   }
 }

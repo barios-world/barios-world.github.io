@@ -1,8 +1,10 @@
 /**
  * ASCII level sketches (levels/src/*.txt) -> Tiled JSON maps (public/levels/*.tmj).
- * Legend:  # ground   = platform (1 tile thick)   ? block   S spawn   F flag   k checkpoint
- *          c card     C royal card   m meistersager   P pipe (bottom cell)   ! coffee block
- *          b bush     t palm         s sign                        // comment lines are ignored
+ * Legend:  # ground  = platform  B brick  ? card block  ! coffee block  H/G/K/Y/D/R form blocks  1/2/3 special blocks
+ *          S spawn  F flag  k checkpoint  c card  C royal card  P pipe (bottom cell)
+ *          mobs: m basic  n nuckel  q schal  v fahne  z trommler  M fanblock
+ *          hazards: x puddle  ^ vent  o ball spawner  - card platform (2 tiles)  ~ moving platform  | vertical platform
+ *          decor: b bush  t palm  s sign  T table  N neon  L floodlight  U stand  W crate  w big cup  l lamp  a tree  i cone  j bench  g vfb sign
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -58,6 +60,28 @@ for (const f of files) {
         case 'c': obj('card', cx, cy); break;
         case 'C': obj('royal', cx, cy); break;
         case 'm': obj('mob', cx, (y + 1) * TS); break;
+        case 'n': obj('mob', cx, (y + 1) * TS, { properties: [{ name: 'variant', type: 'string', value: 'nuckel' }] }); break;
+        case 'q': obj('mob', cx, (y + 1) * TS, { properties: [{ name: 'variant', type: 'string', value: 'schal' }] }); break;
+        case 'v': obj('mob', cx, (y + 1) * TS, { properties: [{ name: 'variant', type: 'string', value: 'fahne' }] }); break;
+        case 'z': obj('mob', cx, (y + 1) * TS, { properties: [{ name: 'variant', type: 'string', value: 'trommler' }] }); break;
+        case 'M': obj('mob', cx, (y + 1) * TS, { properties: [{ name: 'variant', type: 'string', value: 'fanblock' }] }); break;
+        case 'x': obj('puddle', cx, (y + 1) * TS); break;
+        case '^': obj('vent', cx, (y + 1) * TS); break;
+        case 'o': obj('ballspawner', cx, cy); break;
+        case '-': obj('cardplat', cx + TS / 2, cy, { properties: [{ name: 'phase', type: 'int', value: (x * 400) % 1800 }] }); break;
+        case '~': obj('moveplat', cx + TS / 2, cy); break;
+        case '|': obj('moveplat', cx + TS / 2, cy, { properties: [{ name: 'vertical', type: 'bool', value: true }] }); break;
+        case 'T': obj('deco', cx, (y + 1) * TS, { properties: [{ name: 'frame', type: 'string', value: 'deco_table_0' }] }); break;
+        case 'N': obj('deco', cx, (y + 1) * TS, { properties: [{ name: 'frame', type: 'string', value: 'deco_neon_0' }] }); break;
+        case 'L': obj('deco', cx, (y + 1) * TS, { properties: [{ name: 'frame', type: 'string', value: 'deco_floodlight_0' }] }); break;
+        case 'U': obj('deco', cx, (y + 1) * TS, { properties: [{ name: 'frame', type: 'string', value: 'deco_stand_0' }] }); break;
+        case 'W': obj('deco', cx, (y + 1) * TS, { properties: [{ name: 'frame', type: 'string', value: 'crate_0' }] }); break;
+        case 'w': obj('deco', cx, (y + 1) * TS, { properties: [{ name: 'frame', type: 'string', value: 'deco_cup_big_0' }] }); break;
+        case 'l': obj('deco', cx, (y + 1) * TS, { properties: [{ name: 'frame', type: 'string', value: 'lamp_0' }] }); break;
+        case 'a': obj('deco', cx, (y + 1) * TS, { properties: [{ name: 'frame', type: 'string', value: 'tree_0' }] }); break;
+        case 'i': obj('deco', cx, (y + 1) * TS, { properties: [{ name: 'frame', type: 'string', value: 'cone_0' }] }); break;
+        case 'j': obj('deco', cx, (y + 1) * TS, { properties: [{ name: 'frame', type: 'string', value: 'bench_0' }] }); break;
+        case 'g': obj('deco', cx, (y + 1) * TS, { properties: [{ name: 'frame', type: 'string', value: 'sign_vfb_0' }] }); break;
         case 'P': obj('pipe', x * TS, (y + 1) * TS, { width: TS, height: TS * 2, point: false }); break;
         case 's': obj('sign', cx, (y + 1) * TS); break;
         case 'b': obj('bush', cx, (y + 1) * TS); break;

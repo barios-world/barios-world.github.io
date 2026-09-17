@@ -72,3 +72,21 @@ export class Wave extends Phaser.Physics.Arcade.Sprite {
   }
   expired(now: number) { return now - this.born > T.WAVE_LIFE; }
 }
+
+/** Pacifier thrown by the Njuckel-Werfer: arcs toward Bario, breaks on the ground. */
+export class Pacifier extends Phaser.Physics.Arcade.Sprite {
+  declare body: Phaser.Physics.Arcade.Body;
+  born: number;
+  constructor(scene: Phaser.Scene, x: number, y: number, vx: number, vy: number) {
+    super(scene, x, y, 'spr', 'it_nuckel_0');
+    scene.add.existing(this);
+    scene.physics.add.existing(this);
+    this.setDepth(9).setScale(0.7);
+    this.body.setCircle(8, 4, 4);
+    this.body.setVelocity(vx, vy);
+    this.body.setGravityY(T.GRAVITY * 0.55);
+    this.body.setAngularVelocity(vx > 0 ? 300 : -300);
+    this.born = scene.time.now;
+  }
+  expired(now: number) { return now - this.born > 2500; }
+}

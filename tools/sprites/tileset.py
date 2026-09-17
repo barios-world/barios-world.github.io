@@ -66,8 +66,29 @@ while len(tiles) < 24:
 
 COLS = 8
 rows = (len(tiles) + COLS - 1) // COLS
-sheet = Image.new('RGBA', (COLS * T, rows * T), (0, 0, 0, 0))
-for i, g in enumerate(tiles):
-    sheet.alpha_composite(to_image(g, 1), ((i % COLS) * T, (i // COLS) * T))
-sheet.save(os.path.join(ROOT, 'src', 'assets', 'tiles.png'), optimize=True)
-print(f'tileset: {len(tiles)} tiles, {sheet.size[0]}x{sheet.size[1]} -> public/tiles.png')
+
+# world palettes: char remaps applied to the 16 terrain tiles (blocks/bricks stay the same)
+VARIANTS = {
+    'w1': ({}, None),
+    'w2': ({'A': 'I', 'F': 'Y', 'a': 'i', '7': 'J', '8': '#', '9': 'j'}, None),                       # latte: foam over coffee
+    'w3': ({'A': 'a', 'F': 'A', 'a': '#', '7': '@', '8': '#', '9': '$'}, lambda g: g.hline(0, T - 1, 7, 'G') if g.get(3, 3) in ('a', 'A') else None),  # felt + gold trim over dark wood
+    'w4': ({'7': '9', '8': '7', '9': 'w', 'F': 'O'}, None),                                             # pitch: white line, light soil
+}
+for name, (remap, post) in VARIANTS.items():
+    sheet = Image.new('RGBA', (COLS * T, rows * T), (0, 0, 0, 0))
+    for i, g in enumerate(tiles):
+        h = g.copy()
+        if i < 16:
+            for y in range(T):
+                for x in range(T):
+                    c = h.d[y][x]
+                    if c in remap:
+                        h.d[y][x] = remap[c]
+            if post:
+                post(h)
+        sheet.alpha_composite(to_image(h, 1), ((i % COLS) * T, (i // COLS) * T))
+    sheet.save(os.path.join(ROOT, 'src', 'assets', f'tiles_{name}.png'), optimize=True)
+    print(f'tileset {name}: {len(tiles)} tiles, {sheet.size[0]}x{sheet.size[1]}')
+# keep tiles.png = w1 for tools that expect it
+import shutil
+shutil.copy(os.path.join(ROOT, 'src', 'assets', 'tiles_w1.png'), os.path.join(ROOT, 'src', 'assets', 'tiles.png'))

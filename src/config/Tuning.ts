@@ -60,6 +60,12 @@ export const T = {
   SPECIAL_KAFFEE_MS: 10000,
   SPECIAL_BUECHER_MS: 6000,
   SPECIAL_CAMBIO_MS: 8000,
+  // hazards & variants
+  VENT_LIFT: 760,
+  BALL_EVERY: 3200,
+  DRUM_BUFF: 1.5,
+  FAHNE_BUFF: 1.4,
+  FAHNE_RADIUS: 170,
 };
 
 export type TuningKey = keyof typeof T;
