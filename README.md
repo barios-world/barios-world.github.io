@@ -10,6 +10,8 @@ Dauer-Link: **https://zischanahmad.github.io/barios-world/**
 2. Teilen-Symbol → **Zum Home-Bildschirm** → das Spiel läuft als Vollbild-App, auch offline.
 3. Nach einem Update: App einmal komplett schließen und neu öffnen (Service Worker zieht die neue Version).
 
+Vor dem Titel fragt eine Kreidetafel nach dem **Tafel-Code** (nur für Freunde; wird pro Gerät gemerkt). Im Code liegt nur der SHA-256-Hash (`src/scenes/GateScene.ts`); neuen Code setzen: `python3 -c "import hashlib;print(hashlib.sha256(b'DEINCODE').hexdigest())"` und den Hash eintragen. Die Seite ist per `noindex`/`robots.txt` von Suchmaschinen ausgenommen.
+
 Alles wird lokal gespeichert (Fortschritt, Karten, Shop, Einstellungen). `?debug` an die URL hängen oder 3× oben links tippen: Tuning-Regler, Hitboxen, FPS, alle Level offen.
 
 ## Steuerung

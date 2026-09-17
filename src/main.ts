@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import './style.css';
 import { BootScene } from './scenes/BootScene';
 import { PreloadScene } from './scenes/PreloadScene';
+import { GateScene } from './scenes/GateScene';
 import { TitleScene } from './scenes/TitleScene';
 import { LevelSelectScene } from './scenes/LevelSelectScene';
 import { GameScene } from './scenes/GameScene';
@@ -37,7 +38,7 @@ const game = new Phaser.Game({
   physics: { default: 'arcade', arcade: { gravity: { x: 0, y: 0 }, debug: false, tileBias: 32 } },
   input: { activePointers: 4 },
   fps: { target: 60 },
-  scene: [BootScene, PreloadScene, TitleScene, LevelSelectScene, GameScene, HudScene, PauseScene, SettingsScene, ShopScene],
+  scene: [BootScene, PreloadScene, GateScene, TitleScene, LevelSelectScene, GameScene, HudScene, PauseScene, SettingsScene, ShopScene],
 });
 
 let fitTimer = 0;

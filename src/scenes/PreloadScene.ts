@@ -58,13 +58,8 @@ export class PreloadScene extends Phaser.Scene {
     this.makeAnims();
     const params = new URLSearchParams(location.search);
     const start = params.get('level');
-    if (start && LEVELS.some((l) => l.key === start)) {
-      this.registry.set('lives', 3); this.registry.set('hearts', 3); this.registry.set('form', 'base');
-      this.scene.start('game', { level: start });
-      this.scene.launch('hud');
-    } else {
-      this.scene.start('title');
-    }
+    // the Tafel-Code gate decides where to go (title, or straight into ?level= for testing)
+    this.scene.start('gate', { level: start && LEVELS.some((l) => l.key === start) ? start : undefined });
   }
 
   private makeAnims() {
