@@ -23,7 +23,8 @@ window.addEventListener('keydown', unlock);
 
 /** Canvas runs at device resolution (crisp pixels); CSS zoom scales it back to the viewport. */
 const DPR = Math.min(window.devicePixelRatio || 1, 3);
-const size = () => ({ w: Math.round(window.innerWidth * DPR), h: Math.round(window.innerHeight * DPR) });
+// A 0x0 viewport (hidden tab/pane at boot) would make WebGL framebuffer creation fail; clamp to a sane minimum.
+const size = () => ({ w: Math.round(Math.max(window.innerWidth, 320) * DPR), h: Math.round(Math.max(window.innerHeight, 180) * DPR) });
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,

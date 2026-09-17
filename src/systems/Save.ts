@@ -1,6 +1,6 @@
 /** Progress + settings in localStorage. One object, versioned, written on every change. */
 export interface LevelProgress { cleared: boolean; bestSecs: number | null; bestCards: number; totalCards: number; royals: number; }
-export interface Settings { sound: boolean; music: boolean; leftHand: boolean; buttonScale: number; assist: boolean; }
+export interface Settings { sound: boolean; music: boolean; leftHand: boolean; buttonScale: number; assist: boolean; reduceFx: boolean; }
 import { NO_UPGRADES, type UpgradeKey, type Upgrades } from '../data/upgrades';
 
 export interface SaveData {
@@ -11,6 +11,7 @@ export interface SaveData {
   totalCards: number;
   upgrades: Upgrades;
   bossCleared: boolean;
+  bossRushBest: number | null;
 }
 
 const KEY = 'barios-world-save-v1';
@@ -19,10 +20,11 @@ const fresh = (): SaveData => ({
   version: 1,
   progress: {},
   unlocked: [],
-  settings: { sound: true, music: true, leftHand: false, buttonScale: 1, assist: false },
+  settings: { sound: true, music: true, leftHand: false, buttonScale: 1, assist: false, reduceFx: false },
   totalCards: 0,
   upgrades: { ...NO_UPGRADES },
   bossCleared: false,
+  bossRushBest: null,
 });
 
 class SaveStore {
@@ -85,6 +87,15 @@ class SaveStore {
     this.data.upgrades[k] = (this.data.upgrades[k] ?? 0) + 1;
     this.save();
     return true;
+  }
+
+  /** Boss Rush time. Returns the best time and whether this run set it. */
+  recordRush(secs: number) {
+    const prev = this.data.bossRushBest;
+    const isNew = prev === null || secs < prev;
+    if (isNew) this.data.bossRushBest = secs;
+    this.save();
+    return { best: this.data.bossRushBest as number, isNew };
   }
 
   reset() {

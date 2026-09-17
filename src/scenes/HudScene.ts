@@ -18,6 +18,7 @@ export class HudScene extends Phaser.Scene {
   private specialBar!: Phaser.GameObjects.Graphics;
   private meterLbl!: Phaser.GameObjects.Text;
   private bossLbl!: Phaser.GameObjects.Text;
+  private rushTxt!: Phaser.GameObjects.Text;
   private cardIcon!: Phaser.GameObjects.Image;
   private cardTxt!: Phaser.GameObjects.Text;
   private comboTxt!: Phaser.GameObjects.Text;
@@ -54,6 +55,7 @@ export class HudScene extends Phaser.Scene {
     this.specialBar = this.add.graphics();
     this.meterLbl = this.add.text(0, 0, 'KHUSRA', { ...font, fontSize: `${5 * u}px`, color: '#FF4FA3' }).setOrigin(0, 1);
     this.bossLbl = this.add.text(0, 0, 'DER DIREKTOR', { ...font, fontSize: `${6 * u}px`, color: '#FFF4DC' }).setOrigin(0.5, 0).setVisible(false);
+    this.rushTxt = this.add.text(0, 0, '', { ...font, fontSize: `${9 * u}px`, color: '#FFE08A' }).setOrigin(0.5, 0).setShadow(2 * u, 2 * u, '#14100E', 0, true, true).setVisible(false);
     this.cardIcon = this.add.image(0, 0, 'spr', 'it_karte_0').setOrigin(1, 0).setScale(u);
     this.cardTxt = this.add.text(0, 0, 'x 0', font).setOrigin(1, 0);
     this.comboTxt = this.add.text(0, 0, '', { ...font, fontSize: `${7 * u}px`, color: '#FF4FA3' }).setOrigin(1, 0);
@@ -191,6 +193,10 @@ export class HudScene extends Phaser.Scene {
       g.fillStyle(0xe8434f, 1).fillRect(bx, by, bw * bossHp / 100, 8 * u);
       g.fillStyle(0x14100e, 1).fillRect(bx + bw * 0.66 - u, by, 2 * u, 8 * u).fillRect(bx + bw * 0.33 - u, by, 2 * u, 8 * u);
     } else this.bossLbl.setVisible(false);
+    if (gs.rush) {
+      if (!gs.finished) { const secs = Math.max(0, (this.time.now - gs.startTime) / 1000); this.rushTxt.setText(`${Math.floor(secs / 60)}:${(secs % 60).toFixed(1).padStart(4, '0')}`); }
+      this.rushTxt.setVisible(true).setPosition(this.scale.width / 2, inp.pauseRect.bottom + 24 * u);
+    } else this.rushTxt.setVisible(false);
     if (gs.special) {
       const left = Math.max(0, (gs.specialUntil - this.time.now) / (SPECIALS[gs.special].ms));
       const sx = this.specialIcon.x + 26 * u, sy = this.specialIcon.y + 8 * u;

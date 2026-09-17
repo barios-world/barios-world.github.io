@@ -45,20 +45,25 @@ export class TitleScene extends Phaser.Scene {
     y += bh + 8 * u;
     button(this, cx - bw / 4 - 4 * u, y, bw / 2 - 4 * u, bh, 'SHOP', () => this.scene.start('shop'), { u, size: 8 });
     button(this, cx + bw / 4 + 4 * u, y, bw / 2 - 4 * u, bh, 'OPTIONEN', () => this.scene.launch('settings', { from: 'title' }), { u, size: 7 });
+    if (save.data.bossCleared) {
+      y += bh + 8 * u;
+      const best = save.data.bossRushBest;
+      button(this, cx, y, bw, bh, best === null ? 'BOSS RUSH' : `BOSS RUSH  ${best.toFixed(1)}s`, () => this.startLevel('lvl_boss', true), { u, size: 7 });
+    }
 
     // chalk scribbles
     this.add.text(w * 0.12, h * 0.55, 'Life is\nCambio ♥', HAND(u, 14)).setOrigin(0.5).setAngle(-6).setDepth(2).setAlign('center');
     this.add.text(w * 0.86, h * 0.5, 'Same shit\ndifferent level ♥', HAND(u, 13, '#A79C90')).setOrigin(0.5).setAngle(4).setDepth(2).setAlign('center');
     this.add.text(w - 8 * u, h - 6 * u, `Karten gesamt: ${save.data.totalCards}`, PX(u, 5, '#6E635B')).setOrigin(1, 1).setDepth(2);
-    this.add.text(8 * u, h - 6 * u, 'v0.6  M6', PX(u, 5, '#6E635B')).setOrigin(0, 1).setDepth(2);
+    this.add.text(8 * u, h - 6 * u, 'v0.7  M7', PX(u, 5, '#6E635B')).setOrigin(0, 1).setDepth(2);
     if (save.data.bossCleared) this.add.text(w / 2, h * 0.395, 'LEGENDE ♥  Season 1 geschafft', HAND(u, 12, '#FFC24B')).setOrigin(0.5).setDepth(2);
   }
 
-  startLevel(key: string) {
+  startLevel(key: string, rush = false) {
     this.registry.set('lives', 3);
     this.registry.set('hearts', save.settings.assist ? 5 : 3);
     this.registry.set('form', 'base');
-    this.scene.start('game', { level: key });
+    this.scene.start('game', { level: key, rush });
     this.scene.launch('hud');
   }
 }

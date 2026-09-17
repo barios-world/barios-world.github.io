@@ -38,10 +38,10 @@ export class PauseScene extends Phaser.Scene {
   }
 
   restart() {
-    const game = this.scene.get('game') as Phaser.Scene & { levelKey: string };
+    const game = this.scene.get('game') as Phaser.Scene & { levelKey: string; rush: boolean };
     this.scene.stop('settings');
     this.scene.stop();
-    game.scene.restart({ level: game.levelKey });
+    game.scene.restart({ level: game.levelKey, rush: game.rush });
   }
 
   quit() {

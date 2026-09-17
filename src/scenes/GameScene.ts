@@ -48,6 +48,8 @@ export class GameScene extends Phaser.Scene {
   machine?: Phaser.Physics.Arcade.Image;
   machinePhase = 0;
   bossDone = false;
+  /** Boss Rush: shortened intro, running timer, best time saved. */
+  rush = false;
   dust!: Phaser.GameObjects.Particles.ParticleEmitter;
   sparks!: Phaser.GameObjects.Particles.ParticleEmitter;
   paint!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -79,8 +81,9 @@ export class GameScene extends Phaser.Scene {
 
   constructor() { super('game'); }
 
-  init(data: { level?: string }) {
+  init(data: { level?: string; rush?: boolean }) {
     if (data?.level) this.levelKey = data.level;
+    this.rush = !!data?.rush;
   }
 
   create() {
@@ -101,6 +104,12 @@ export class GameScene extends Phaser.Scene {
     this.machinePhase = 0;
     this.bossDone = false;
     this.registry.set('bossHp', -1);
+    if (save.settings.reduceFx) {
+      // Barrierefreiheit: keine Blitze, kein Wackeln (Hitstop entfaellt in hitstop()).
+      const cam = this.cameras.main;
+      cam.flash = (() => cam) as unknown as typeof cam.flash;
+      cam.shake = (() => cam) as unknown as typeof cam.shake;
+    }
     this.inputSys = new InputSystem(this);
     const level = LEVELS.find((l) => l.key === this.levelKey) ?? LEVELS[0];
     const theme = worldOf(level.world);
@@ -280,7 +289,8 @@ export class GameScene extends Phaser.Scene {
       this.physics.add.overlap(this.cups, this.torches, (c, t) => this.torchHit(c as Phaser.Physics.Arcade.Sprite, t as Phaser.Physics.Arcade.Sprite));
       this.physics.add.overlap(this.homing, this.torches, (c, t) => this.torchHit(c as Phaser.Physics.Arcade.Sprite, t as Phaser.Physics.Arcade.Sprite));
       if (this.machine) this.physics.add.overlap(this.player, this.machine, () => this.useMachine());
-      this.time.delayedCall(300, () => this.events.emit('msg', 'DER DIREKTOR\n\nRUHE IM SPIEL, CHAOS IM KOPF.', 2200));
+      if (this.rush) { b.timer = 700; this.time.delayedCall(200, () => this.events.emit('msg', 'BOSS RUSH!\nDIE ZEIT LAEUFT.', 1400)); }
+      else this.time.delayedCall(300, () => this.events.emit('msg', 'DER DIREKTOR\n\nRUHE IM SPIEL, CHAOS IM KOPF.', 2200));
       this.cameras.main.flash(400, 40, 10, 20);
     }
 
@@ -752,11 +762,19 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ------------------------------------------------------------ cards
+  /** Floating score text in world space, rendered crisp for the current camera zoom. */
+  pop(x: number, y: number, s: string, color = '#FFF4DC') {
+    const z = this.cameras.main.zoom || 1;
+    const t = this.add.text(x, y, s, { fontFamily: '"Press Start 2P", monospace', fontSize: `${6 * z}px`, color }).setOrigin(0.5).setScale(1 / z).setDepth(30).setShadow(z, z, '#14100E', 0, true, true);
+    this.tweens.add({ targets: t, y: y - 18, alpha: 0, duration: 650, ease: 'Quad.out', onComplete: () => t.destroy() });
+  }
+
   bankCards(v: number, x: number, y: number, royal: boolean) {
     const now = this.time.now;
     this.combo = now < this.comboUntil ? this.combo + 1 : 1;
     this.comboUntil = now + T.COMBO_WINDOW;
     this.registry.inc('cards', v);
+    this.pop(x, y - 10, `+${v}`, royal ? '#FFC24B' : '#FFF4DC');
     this.registry.set('combo', this.combo);
     this.addKhusra(T.KHUSRA_CARD + Math.min(this.combo, 6));
     if (royal) audio.royal(); else audio.card(this.combo);
@@ -889,6 +907,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   hitstop() {
+    if (save.settings.reduceFx) return;
     this.physics.world.pause();
     this.time.delayedCall(T.HITSTOP_MS, () => { if (!this.overlay) this.physics.world.resume(); });
   }
@@ -952,9 +971,12 @@ export class GameScene extends Phaser.Scene {
     save.recordResult(this.levelKey, secs, cards, this.totalCards, royals);
     const nx = nextLevel(this.levelKey);
     if (nx.world > 0 && LEVELS.indexOf(nx) > LEVELS.findIndex((l) => l.key === this.levelKey)) save.unlock(nx.key);
+    const rush = this.boss && this.rush ? save.recordRush(secs) : null;
     this.time.delayedCall(700, () => {
       this.physics.world.pause();
-      this.overlay = this.boss
+      this.overlay = rush
+        ? { kind: 'result', lines: ['BOSS RUSH!', '', `ZEIT     ${secs.toFixed(1)}s`, rush.isNew ? 'NEUE BESTZEIT!' : `BEST     ${rush.best.toFixed(1)}s`, 'ER VERLIERT IHN NIE...'], hint: 'TIPPEN  -  ZURUECK ZUM ANFANG' }
+        : this.boss
         ? { kind: 'result', lines: ['LEGENDE!', '', 'END OF THE LEVEL.', 'BEGINNING OF A LEGEND.', `ZEIT     ${secs.toFixed(1)}s`], hint: 'TIPPEN  -  ZURUECK ZUM ANFANG' }
         : { kind: 'result', lines: ['CAMBIO!', '', `KARTEN   ${cards} / ${this.totalCards}`, `ZEIT     ${secs.toFixed(1)}s${newBest ? '  NEU!' : ''}`, noDmg ? 'OHNE SCHADEN  +500' : royals ? `ROYALS   ${royals}` : ''], hint: 'TIPPEN FUER WEITER' };
       this.events.emit('overlay', this.overlay);
@@ -1021,7 +1043,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.movers.getChildren().forEach((p) => (p as MovingPlatform).tick());
     if (this.boss) {
-      if (!this.player.dead) this.boss.update(dt * this.worldScale, this.player);
+      if (!this.player.dead) this.boss.update(dt * this.worldScale * (save.settings.assist ? 0.85 : 1), this.player);
       this.registry.set('bossHp', this.boss.hp);
       this.glasses.getChildren().slice().forEach((g) => { const gl = g as Glasses; gl.tick(now); if (gl.expired(now)) gl.destroy(); });
       this.rain.getChildren().slice().forEach((r) => { const rc = r as RainCup; if (rc.expired(now) || rc.y > this.map.heightInPixels + 50) rc.destroy(); });
