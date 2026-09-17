@@ -7,6 +7,8 @@ import { Mob } from '../entities/Mob';
 import { Block } from '../entities/Block';
 import { Cup, Wave } from '../entities/Projectiles';
 import { LEVELS, nextLevel } from '../data/levels';
+import { save } from '../systems/Save';
+import { TRACK_BOULEVARD } from '../systems/Audio';
 
 type Obj = Phaser.Types.Tilemaps.TiledObject;
 type Overlay = { kind: 'result' | 'gameover'; lines: string[]; hint: string } | null;
@@ -21,9 +23,9 @@ export class GameScene extends Phaser.Scene {
   solids!: Phaser.Physics.Arcade.StaticGroup;
   blocks: Block[] = [];
   mobs: Mob[] = [];
-  mobGroup!: Phaser.Physics.Arcade.Group;
-  cups!: Phaser.Physics.Arcade.Group;
-  waves!: Phaser.Physics.Arcade.Group;
+  mobGroup!: Phaser.GameObjects.Group;
+  cups!: Phaser.GameObjects.Group;
+  waves!: Phaser.GameObjects.Group;
   pickups!: Phaser.Physics.Arcade.Group;
   flag?: Phaser.Physics.Arcade.Image;
   dust!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -75,9 +77,10 @@ export class GameScene extends Phaser.Scene {
     this.cards = this.physics.add.staticGroup();
     this.checkpoints = this.physics.add.staticGroup();
     this.solids = this.physics.add.staticGroup();
-    this.mobGroup = this.physics.add.group();
-    this.cups = this.physics.add.group({ runChildUpdate: false });
-    this.waves = this.physics.add.group();
+    // plain groups: physics groups would reset velocity/gravity of children on add()
+    this.mobGroup = this.add.group();
+    this.cups = this.add.group();
+    this.waves = this.add.group();
     this.pickups = this.physics.add.group();
 
     // --- objects
@@ -153,7 +156,7 @@ export class GameScene extends Phaser.Scene {
 
     // --- mobs
     for (const [x, y] of mobDefs) {
-      const m = new Mob(this, x, y, this.ground);
+      const m = new Mob(this, x, y, this.ground, save.settings.assist ? 0.7 : 1);
       m.onShout = (sx, sy, dir) => this.waves.add(new Wave(this, sx, sy, dir));
       this.mobs.push(m);
       this.mobGroup.add(m);
@@ -187,16 +190,33 @@ export class GameScene extends Phaser.Scene {
     this.events.once('shutdown', () => this.scale.off('resize', this.applyZoom, this));
 
     // --- run state
+    const maxHearts = save.settings.assist ? 5 : 3;
+    this.registry.set('maxHearts', maxHearts);
     this.registry.set('cards', 0);
+    this.registry.set('royals', 0);
     if (!this.registry.has('lives')) this.registry.set('lives', 3);
-    if (!this.registry.has('hearts') || this.registry.get('hearts') <= 0) this.registry.set('hearts', 3);
+    if (!this.registry.has('hearts') || this.registry.get('hearts') <= 0 || this.registry.get('hearts') > maxHearts) this.registry.set('hearts', maxHearts);
     this.startTime = this.time.now;
+    audio.play(TRACK_BOULEVARD);
+    this.game.events.on(Phaser.Core.Events.HIDDEN, this.onHidden, this);
+    this.events.once('shutdown', () => this.game.events.off(Phaser.Core.Events.HIDDEN, this.onHidden, this));
     const def = LEVELS.find((l) => l.key === this.levelKey);
     this.events.emit('msg', def ? def.name : '', 1400);
     this.events.emit('overlay', null);
     this.input.on('pointerdown', this.onTapOverlay, this);
     this.input.keyboard?.on('keydown-SPACE', this.onTapOverlay, this);
     this.input.keyboard?.on('keydown-ENTER', this.onTapOverlay, this);
+  }
+
+  private onHidden() {
+    if (this.scene.isActive() && !this.overlay && !this.finished && !this.player.dead) this.pauseGame();
+  }
+
+  pauseGame() {
+    if (this.scene.isPaused() || this.scene.isActive('pause')) return;
+    this.inputSys.release();
+    this.scene.launch('pause');
+    this.scene.pause();
   }
 
   private findGroundTop() {
@@ -335,7 +355,7 @@ export class GameScene extends Phaser.Scene {
     if (this.player.dead) return;
     this.player.dead = true;
     audio.die();
-    this.registry.inc('lives', -1);
+    if (!save.settings.assist) this.registry.inc('lives', -1);
     const lives = this.registry.get('lives') as number;
     this.cameras.main.shake(160, 0.01);
     this.player.body.setVelocity(0, -300);
@@ -357,7 +377,7 @@ export class GameScene extends Phaser.Scene {
   respawn() {
     this.cameras.main.fadeOut(120, 15, 13, 12);
     this.time.delayedCall(130, () => {
-      this.registry.set('hearts', 3);
+      this.registry.set('hearts', this.registry.get('maxHearts') ?? 3);
       this.player.gfx.setAngle(0);
       this.player.setForm('base');
       this.player.spawnAt(this.respawnPoint.x, this.respawnPoint.y);
@@ -383,12 +403,17 @@ export class GameScene extends Phaser.Scene {
     this.player.body.setVelocity(0, 0);
     this.player.body.setAllowGravity(false);
     this.cameras.main.flash(220, 255, 79, 163);
-    this.registry.set('lastResult', { cards, secs, noDmg });
+    const royals = (this.registry.get('royals') as number) || 0;
+    const prev = save.progress(this.levelKey);
+    const newBest = prev.bestSecs === null || secs < prev.bestSecs;
+    save.recordResult(this.levelKey, secs, cards, this.totalCards, royals);
+    const nx = nextLevel(this.levelKey);
+    if (nx.world > 0 && LEVELS.indexOf(nx) > LEVELS.findIndex((l) => l.key === this.levelKey)) save.unlock(nx.key);
     this.time.delayedCall(700, () => {
       this.physics.world.pause();
       this.overlay = {
         kind: 'result',
-        lines: ['CAMBIO!', '', `KARTEN   ${cards} / ${this.totalCards}`, `ZEIT     ${secs.toFixed(1)}s`, noDmg ? 'OHNE SCHADEN  +500' : ''],
+        lines: ['CAMBIO!', '', `KARTEN   ${cards} / ${this.totalCards}`, `ZEIT     ${secs.toFixed(1)}s${newBest ? '  NEU!' : ''}`, noDmg ? 'OHNE SCHADEN  +500' : ''],
         hint: 'TIPPEN FUER WEITER',
       };
       this.events.emit('overlay', this.overlay);
@@ -408,7 +433,14 @@ export class GameScene extends Phaser.Scene {
       this.scene.restart({ level: this.levelKey });
     } else {
       this.registry.set('form', this.player.form);
-      this.scene.restart({ level: nextLevel(this.levelKey).key });
+      const nx = nextLevel(this.levelKey);
+      const idx = LEVELS.findIndex((l) => l.key === this.levelKey);
+      if (nx.world > 0 && LEVELS.indexOf(nx) > idx) {
+        this.scene.restart({ level: nx.key });
+      } else {
+        this.scene.stop('hud');
+        this.scene.start('title');
+      }
     }
   }
 
@@ -418,6 +450,7 @@ export class GameScene extends Phaser.Scene {
     this.inputSys.update();
     if (this.overlay) return;
     if (this.finished) { this.player.syncGfx(); return; }
+    if (this.inputSys.pausePressed) { this.pauseGame(); return; }
     if (!this.player.dead) this.player.update(this.inputSys, dt);
     else this.player.syncGfx();
 

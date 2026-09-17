@@ -69,5 +69,5 @@ rows = (len(tiles) + COLS - 1) // COLS
 sheet = Image.new('RGBA', (COLS * T, rows * T), (0, 0, 0, 0))
 for i, g in enumerate(tiles):
     sheet.alpha_composite(to_image(g, 1), ((i % COLS) * T, (i // COLS) * T))
-sheet.save(os.path.join(ROOT, 'public', 'tiles.png'), optimize=True)
+sheet.save(os.path.join(ROOT, 'src', 'assets', 'tiles.png'), optimize=True)
 print(f'tileset: {len(tiles)} tiles, {sheet.size[0]}x{sheet.size[1]} -> public/tiles.png')

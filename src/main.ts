@@ -1,9 +1,19 @@
 import Phaser from 'phaser';
+import './style.css';
 import { BootScene } from './scenes/BootScene';
 import { PreloadScene } from './scenes/PreloadScene';
+import { TitleScene } from './scenes/TitleScene';
+import { LevelSelectScene } from './scenes/LevelSelectScene';
 import { GameScene } from './scenes/GameScene';
 import { HudScene } from './scenes/HudScene';
+import { PauseScene } from './scenes/PauseScene';
+import { SettingsScene } from './scenes/SettingsScene';
 import { audio } from './systems/Audio';
+import { save } from './systems/Save';
+
+save.load();
+audio.setSound(save.settings.sound);
+audio.setMusic(save.settings.music);
 
 // iOS needs a user gesture before any sound can play
 const unlock = () => audio.unlock();
@@ -17,7 +27,7 @@ const size = () => ({ w: Math.round(window.innerWidth * DPR), h: Math.round(wind
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',
-  backgroundColor: '#FFC2DC',
+  backgroundColor: '#171311',
   pixelArt: true,
   roundPixels: true,
   antialias: false,
@@ -25,7 +35,7 @@ const game = new Phaser.Game({
   physics: { default: 'arcade', arcade: { gravity: { x: 0, y: 0 }, debug: false, tileBias: 32 } },
   input: { activePointers: 4 },
   fps: { target: 60 },
-  scene: [BootScene, PreloadScene, GameScene, HudScene],
+  scene: [BootScene, PreloadScene, TitleScene, LevelSelectScene, GameScene, HudScene, PauseScene, SettingsScene],
 });
 
 let fitTimer = 0;
@@ -36,5 +46,10 @@ const fit = () => {
 window.addEventListener('resize', fit);
 window.visualViewport?.addEventListener('resize', fit);
 window.addEventListener('orientationchange', () => setTimeout(fit, 250));
+
+// Offline: cache the app after the first visit (production only, dev uses HMR)
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+}
 
 (window as unknown as { __game: Phaser.Game }).__game = game;

@@ -5,7 +5,7 @@ from px import *
 from assemble import assemble
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-PUB = os.path.join(ROOT, 'public')
+PUB = os.path.join(ROOT, 'src', 'assets')
 W, PAD = 1024, 2
 
 SPR = assemble(include_scenes=False)

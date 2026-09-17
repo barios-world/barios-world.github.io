@@ -1,5 +1,11 @@
 import Phaser from 'phaser';
 import { LEVELS } from '../data/levels';
+import atlasPng from '../assets/atlas.png';
+import atlasJson from '../assets/atlas.json?url';
+import tilesPng from '../assets/tiles.png';
+
+// Level files are imported as hashed URLs so the service worker can cache them safely.
+const LEVEL_URLS = import.meta.glob('../assets/levels/*.tmj', { query: '?url', import: 'default', eager: true }) as Record<string, string>;
 
 const ANIMS: [string, number][] = [
   ['bario_idle', 2], ['bario_walk', 10], ['bario_run', 14],
@@ -24,10 +30,14 @@ export class PreloadScene extends Phaser.Scene {
     });
     this.load.once('complete', () => { bar.destroy(); txt.destroy(); sub.destroy(); });
 
-    this.load.atlas('spr', 'atlas.png', 'atlas.json');
-    this.load.image('tiles', 'tiles.png');
-    this.load.spritesheet('tilesS', 'tiles.png', { frameWidth: 32, frameHeight: 32 });
-    for (const l of LEVELS) this.load.tilemapTiledJSON(l.key, l.file);
+    this.load.atlas('spr', atlasPng, atlasJson);
+    this.load.image('tiles', tilesPng);
+    this.load.spritesheet('tilesS', tilesPng, { frameWidth: 32, frameHeight: 32 });
+    for (const l of LEVELS) {
+      const file = l.file.replace(/^levels\//, '');
+      const url = Object.entries(LEVEL_URLS).find(([k]) => k.endsWith('/' + file))?.[1];
+      if (url) this.load.tilemapTiledJSON(l.key, url);
+    }
   }
 
   async create() {
@@ -38,9 +48,15 @@ export class PreloadScene extends Phaser.Scene {
       ]);
     } catch { /* fonts are optional */ }
     this.makeAnims();
-    const start = new URLSearchParams(location.search).get('level');
-    this.scene.start('game', { level: start && LEVELS.some((l) => l.key === start) ? start : LEVELS[0].key });
-    this.scene.launch('hud');
+    const params = new URLSearchParams(location.search);
+    const start = params.get('level');
+    if (start && LEVELS.some((l) => l.key === start)) {
+      this.registry.set('lives', 3); this.registry.set('hearts', 3); this.registry.set('form', 'base');
+      this.scene.start('game', { level: start });
+      this.scene.launch('hud');
+    } else {
+      this.scene.start('title');
+    }
   }
 
   private makeAnims() {

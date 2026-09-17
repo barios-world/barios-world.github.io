@@ -20,12 +20,14 @@ export class HudScene extends Phaser.Scene {
   private msgTimer?: Phaser.Time.TimerEvent;
   private jumpLbl!: Phaser.GameObjects.Text;
   private atkLbl!: Phaser.GameObjects.Text;
+  private pauseLbl!: Phaser.GameObjects.Text;
   private ovPanel!: Phaser.GameObjects.Graphics;
   private ovLines: Phaser.GameObjects.Text[] = [];
   private ovHint!: Phaser.GameObjects.Text;
   private overlay: Overlay = null;
   private inset = { top: 0, left: 0, right: 0, bottom: 0 };
   private touch = false;
+  private handlers: [Phaser.Events.EventEmitter, string, (...a: any[]) => void][] = [];
 
   constructor() { super('hud'); }
 
@@ -33,12 +35,15 @@ export class HudScene extends Phaser.Scene {
     this.gameScene = this.scene.get('game') as GameScene;
     this.u = Math.max(1, Math.min(window.devicePixelRatio || 1, 3));
     this.touch = this.sys.game.device.input.touch;
+    this.hearts = [];
+    this.ovLines = [];
+    this.handlers = [];
     const u = this.u;
     const font = { fontFamily: '"Press Start 2P", monospace', fontSize: `${9 * u}px`, color: '#FFF4DC' };
     this.gfx = this.add.graphics();
     this.portrait = this.add.image(0, 0, 'spr', 'port_bario_0').setOrigin(0, 0).setScale(1.5 * u);
     this.nameTxt = this.add.text(0, 0, 'BARIO x3', font);
-    for (let i = 0; i < 3; i++) this.hearts.push(this.add.image(0, 0, 'spr', 'herz_s_0').setOrigin(0, 0).setScale(2 * u));
+    for (let i = 0; i < 5; i++) this.hearts.push(this.add.image(0, 0, 'spr', 'herz_s_0').setOrigin(0, 0).setScale(2 * u));
     this.formIcon = this.add.image(0, 0, 'spr', 'it_kaffee_0').setOrigin(0, 0).setScale(u).setVisible(false);
     this.cardIcon = this.add.image(0, 0, 'spr', 'it_karte_0').setOrigin(1, 0).setScale(u);
     this.cardTxt = this.add.text(0, 0, 'x 0', font).setOrigin(1, 0);
@@ -47,6 +52,7 @@ export class HudScene extends Phaser.Scene {
     const small = { ...font, fontSize: `${7 * u}px`, color: '#14100E' };
     this.jumpLbl = this.add.text(0, 0, 'SPRUNG', small).setOrigin(0.5).setVisible(this.touch);
     this.atkLbl = this.add.text(0, 0, 'WURF', small).setOrigin(0.5).setVisible(this.touch);
+    this.pauseLbl = this.add.text(0, 0, 'II', { ...font, fontSize: `${9 * u}px`, color: '#FFF4DC' }).setOrigin(0.5);
 
     this.ovPanel = this.add.graphics().setDepth(20).setVisible(false);
     for (let i = 0; i < 6; i++) this.ovLines.push(this.add.text(0, 0, '', { ...font, fontSize: `${(i === 0 ? 16 : 9) * u}px`, color: i === 0 ? '#FF4FA3' : '#FFF4DC', align: 'center' }).setOrigin(0.5).setDepth(21).setVisible(false));
@@ -56,16 +62,33 @@ export class HudScene extends Phaser.Scene {
     this.layout();
     this.scale.on('resize', this.layout, this);
     const reg = this.registry;
-    reg.events.on('changedata-cards', (_p: unknown, v: number) => this.cardTxt.setText('x ' + v));
-    reg.events.on('changedata-hearts', (_p: unknown, v: number) => this.hearts.forEach((h, i) => h.setFrame(i < v ? 'herz_s_0' : 'herz_leer_0')));
-    reg.events.on('changedata-lives', (_p: unknown, v: number) => this.nameTxt.setText('BARIO x' + Math.max(0, v)));
-    reg.events.on('changedata-form', (_p: unknown, v: string) => this.formIcon.setVisible(v !== 'base'));
-    reg.events.on('changedata-combo', (_p: unknown, v: number) => this.comboTxt.setText(v >= 2 ? `COMBO x${v}` : ''));
-    this.gameScene.events.on('msg', (s: string, ms?: number) => this.showMsg(s, ms));
-    this.gameScene.events.on('overlay', (o: Overlay) => this.showOverlay(o));
-    this.events.once('shutdown', () => this.scale.off('resize', this.layout, this));
+    this.on(reg.events, 'changedata-cards', (_p: unknown, v: number) => this.cardTxt.setText('x ' + v));
+    this.on(reg.events, 'changedata-hearts', () => this.drawHearts());
+    this.on(reg.events, 'changedata-maxHearts', () => this.drawHearts());
+    this.on(reg.events, 'changedata-lives', (_p: unknown, v: number) => this.nameTxt.setText('BARIO x' + Math.max(0, v)));
+    this.on(reg.events, 'changedata-form', (_p: unknown, v: string) => this.formIcon.setVisible(v !== 'base'));
+    this.on(reg.events, 'changedata-combo', (_p: unknown, v: number) => this.comboTxt.setText(v >= 2 ? `COMBO x${v}` : ''));
+    this.on(this.gameScene.events, 'msg', (s: string, ms?: number) => this.showMsg(s, ms));
+    this.on(this.gameScene.events, 'overlay', (o: Overlay) => this.showOverlay(o));
+    this.events.once('shutdown', () => {
+      this.scale.off('resize', this.layout, this);
+      for (const [em, ev, fn] of this.handlers) em.off(ev, fn);
+    });
     this.cardTxt.setText('x ' + (reg.get('cards') ?? 0));
     this.nameTxt.setText('BARIO x' + (reg.get('lives') ?? 3));
+    this.formIcon.setVisible((reg.get('form') ?? 'base') !== 'base');
+    this.drawHearts();
+  }
+
+  private on(em: Phaser.Events.EventEmitter, ev: string, fn: (...a: any[]) => void) {
+    em.on(ev, fn);
+    this.handlers.push([em, ev, fn]);
+  }
+
+  private drawHearts() {
+    const v = (this.registry.get('hearts') as number) ?? 3;
+    const max = (this.registry.get('maxHearts') as number) ?? 3;
+    this.hearts.forEach((h, i) => h.setVisible(i < max).setFrame(i < v ? 'herz_s_0' : 'herz_leer_0'));
   }
 
   private showMsg(s: string, ms?: number) {
@@ -115,7 +138,7 @@ export class HudScene extends Phaser.Scene {
     this.portrait.setPosition(L, top);
     this.nameTxt.setPosition(L + 36 * 1.5 * u + 8 * u, top + 3 * u);
     this.hearts.forEach((hh, i) => hh.setPosition(L + 36 * 1.5 * u + 8 * u + i * 26 * u, top + 20 * u));
-    this.formIcon.setPosition(L + 36 * 1.5 * u + 8 * u + 3 * 26 * u + 4 * u, top + 16 * u);
+    this.formIcon.setPosition(L + 36 * 1.5 * u + 8 * u + 5 * 26 * u + 4 * u, top + 16 * u);
     this.cardTxt.setPosition(R, top + 6 * u);
     this.cardIcon.setPosition(R - this.cardTxt.width - 8 * u, top);
     this.comboTxt.setPosition(R, top + 26 * u);
@@ -127,8 +150,18 @@ export class HudScene extends Phaser.Scene {
     const g = this.gfx;
     g.clear();
     const inp = this.gameScene.inputSys;
-    if (!inp || !this.touch || this.overlay) return;
+    const paused = this.scene.isPaused('game') || this.scene.isActive('pause');
+    const showControls = !!inp && this.touch && !this.overlay && !paused;
+    this.jumpLbl.setVisible(showControls);
+    this.atkLbl.setVisible(showControls);
+    this.pauseLbl.setVisible(!!inp && !this.overlay && !paused);
+    if (!inp || this.overlay || paused) return;
     const u = this.u;
+    // pause button (top center)
+    const pr = inp.pauseRect;
+    g.fillStyle(0x14100e, 0.35).fillRoundedRect(pr.x, pr.y + 4 * u, pr.width, pr.height - 8 * u, 6 * u);
+    this.pauseLbl.setPosition(pr.centerX, pr.centerY + 2 * u);
+    if (!showControls) return;
     if (inp.stickActive) {
       g.lineStyle(3 * u, 0xfff4dc, 0.5).strokeCircle(inp.stickOrigin.x, inp.stickOrigin.y, T.STICK_RADIUS * u);
       g.fillStyle(0xfff4dc, 0.55).fillCircle(inp.stickKnob.x, inp.stickKnob.y, 17 * u);

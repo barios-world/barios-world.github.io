@@ -1,19 +1,23 @@
 import Phaser from 'phaser';
 import { T } from '../config/Tuning';
+import { save } from './Save';
 
-/** Unified input: keyboard (Mac test) + touch (floating stick left, jump/attack right). All coords in canvas px. */
+/** Unified input: keyboard (Mac test) + touch (floating stick on one half, jump/attack on the other). All coords in canvas px. */
 export class InputSystem {
   axis = 0;
   jumpHeld = false;
   jumpPressed = false;
   attackPressed = false;
+  pausePressed = false;
 
   stickActive = false;
   stickOrigin = new Phaser.Math.Vector2();
   stickKnob = new Phaser.Math.Vector2();
   jumpRect = new Phaser.Geom.Rectangle();
   attackRect = new Phaser.Geom.Rectangle();
+  pauseRect = new Phaser.Geom.Rectangle();
   ui = 1;
+  leftHand = false;
 
   private scene: Phaser.Scene;
   private keys: Record<string, Phaser.Input.Keyboard.Key>;
@@ -23,11 +27,12 @@ export class InputSystem {
   private jumpWasHeld = false;
   private jumpQueued = false;
   private attackQueued = false;
+  private pauseQueued = false;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
     const kb = scene.input.keyboard!;
-    this.keys = kb.addKeys({ left: 'LEFT', right: 'RIGHT', up: 'UP', a: 'A', d: 'D', w: 'W', space: 'SPACE', x: 'X', j: 'J', k: 'K', shift: 'SHIFT' }) as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = kb.addKeys({ left: 'LEFT', right: 'RIGHT', up: 'UP', a: 'A', d: 'D', w: 'W', space: 'SPACE', x: 'X', j: 'J', k: 'K', shift: 'SHIFT', p: 'P', esc: 'ESC' }) as Record<string, Phaser.Input.Keyboard.Key>;
     scene.input.addPointer(3);
     scene.input.on('pointerdown', this.onDown, this);
     scene.input.on('pointermove', this.onMove, this);
@@ -35,21 +40,31 @@ export class InputSystem {
     scene.input.on('pointerupoutside', this.onUp, this);
     this.layout();
     scene.scale.on('resize', this.layout, this);
-    scene.events.once('shutdown', () => scene.scale.off('resize', this.layout, this));
+    scene.game.events.on('controls-changed', this.layout, this);
+    scene.events.once('shutdown', () => {
+      scene.scale.off('resize', this.layout, this);
+      scene.game.events.off('controls-changed', this.layout, this);
+    });
   }
 
   layout() {
     const w = this.scene.scale.width, h = this.scene.scale.height;
     const u = (this.ui = Math.max(1, Math.min(window.devicePixelRatio || 1, 3)));
-    const r = 44 * u;
-    this.jumpRect.setTo(w - 2 * r - 18 * u, h - 2 * r - 18 * u, 2 * r, 2 * r);
-    this.attackRect.setTo(w - 2 * r - 18 * u, h - 2 * r - 18 * u - 1.5 * r - 14 * u, 2 * r, 1.5 * r);
+    this.leftHand = save.settings.leftHand;
+    const r = 44 * u * (save.settings.buttonScale || 1);
+    const m = 18 * u;
+    const bx = this.leftHand ? m : w - 2 * r - m;
+    this.jumpRect.setTo(bx, h - 2 * r - m, 2 * r, 2 * r);
+    this.attackRect.setTo(bx, h - 2 * r - m - 1.5 * r - 14 * u, 2 * r, 1.5 * r);
+    this.pauseRect.setTo(w / 2 - 22 * u, 0, 44 * u, 34 * u);
   }
 
   private onDown(p: Phaser.Input.Pointer) {
     const w = this.scene.scale.width;
+    if (Phaser.Geom.Rectangle.Contains(this.pauseRect, p.x, p.y)) { this.pauseQueued = true; return; }
     if (Phaser.Geom.Rectangle.Contains(this.attackRect, p.x, p.y)) { this.attackQueued = true; return; }
-    if (p.x >= w * 0.5) {
+    const buttonSide = this.leftHand ? p.x < w * 0.5 : p.x >= w * 0.5;
+    if (buttonSide) {
       if (this.jumpPointerId < 0) { this.jumpPointerId = p.id; this.jumpQueued = true; }
       return;
     }
@@ -96,5 +111,14 @@ export class InputSystem {
     const kAtk = Phaser.Input.Keyboard.JustDown(k.x) || Phaser.Input.Keyboard.JustDown(k.j) || Phaser.Input.Keyboard.JustDown(k.k);
     this.attackPressed = kAtk || this.attackQueued;
     this.attackQueued = false;
+
+    this.pausePressed = Phaser.Input.Keyboard.JustDown(k.p) || Phaser.Input.Keyboard.JustDown(k.esc) || this.pauseQueued;
+    this.pauseQueued = false;
+  }
+
+  /** Drop any held touch (e.g. when pausing) so nothing sticks. */
+  release() {
+    this.stickPointerId = -1; this.jumpPointerId = -1; this.stickActive = false; this.touchAxis = 0;
+    this.jumpQueued = false; this.attackQueued = false; this.pauseQueued = false;
   }
 }

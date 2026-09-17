@@ -15,9 +15,11 @@ export class Mob extends Phaser.Physics.Arcade.Sprite {
   spawnY: number;
   ground: Phaser.Tilemaps.TilemapLayer;
   onShout?: (x: number, y: number, dir: number) => void;
+  speedMul = 1;
 
-  constructor(scene: Phaser.Scene, x: number, groundY: number, ground: Phaser.Tilemaps.TilemapLayer) {
+  constructor(scene: Phaser.Scene, x: number, groundY: number, ground: Phaser.Tilemaps.TilemapLayer, speedMul = 1) {
     super(scene, x, groundY - 26, 'spr', 'meister_idle_0');
+    this.speedMul = speedMul;
     this.ground = ground;
     this.spawnX = x; this.spawnY = groundY;
     scene.add.existing(this);
@@ -51,7 +53,7 @@ export class Mob extends Phaser.Physics.Arcade.Sprite {
         if (b.blocked.left) this.dir = 1;
         else if (b.blocked.right) this.dir = -1;
         else if (grounded && this.ledgeAhead()) this.dir = -this.dir;
-        b.setVelocityX(this.dir * T.MOB_WALK);
+        b.setVelocityX(this.dir * T.MOB_WALK * this.speedMul);
         if (!player.dead && adx < T.MOB_NOTICE && ady < 90 && Math.sign(dx) === this.dir) {
           this.state = 'notice'; this.timer = 450; b.setVelocityX(0); audio.notice();
         }
@@ -63,7 +65,7 @@ export class Mob extends Phaser.Physics.Arcade.Sprite {
       case 'run':
         this.dir = Math.sign(dx) || this.dir;
         if (grounded && this.ledgeAhead()) b.setVelocityX(0);
-        else b.setVelocityX(this.dir * T.MOB_RUN);
+        else b.setVelocityX(this.dir * T.MOB_RUN * this.speedMul);
         if (adx < T.MOB_ATTACK_RANGE && ady < 70) { this.state = 'attack'; this.timer = T.MOB_TELEGRAPH; b.setVelocityX(0); }
         else if (adx > T.MOB_LOSE || player.dead) this.state = 'patrol';
         break;

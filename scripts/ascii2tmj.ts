@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const SRC = 'levels/src';
-const OUT = 'public/levels';
+const OUT = 'src/assets/levels';
 const TS = 32;
 
 // tile ids (0-based) in tiles.png, see tools/sprites/tileset.py
