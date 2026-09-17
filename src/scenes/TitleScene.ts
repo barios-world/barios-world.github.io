@@ -55,7 +55,7 @@ export class TitleScene extends Phaser.Scene {
     this.add.text(w * 0.12, h * 0.55, 'Life is\nCambio ♥', HAND(u, 14)).setOrigin(0.5).setAngle(-6).setDepth(2).setAlign('center');
     this.add.text(w * 0.86, h * 0.5, 'Same shit\ndifferent level ♥', HAND(u, 13, '#A79C90')).setOrigin(0.5).setAngle(4).setDepth(2).setAlign('center');
     this.add.text(w - 8 * u, h - 6 * u, `Karten gesamt: ${save.data.totalCards}`, PX(u, 5, '#6E635B')).setOrigin(1, 1).setDepth(2);
-    this.add.text(8 * u, h - 6 * u, 'v0.7  M7', PX(u, 5, '#6E635B')).setOrigin(0, 1).setDepth(2);
+    this.add.text(8 * u, h - 6 * u, 'v0.7.1  M7', PX(u, 5, '#6E635B')).setOrigin(0, 1).setDepth(2);
     if (save.data.bossCleared) this.add.text(w / 2, h * 0.395, 'LEGENDE ♥  Season 1 geschafft', HAND(u, 12, '#FFC24B')).setOrigin(0.5).setDepth(2);
   }
 

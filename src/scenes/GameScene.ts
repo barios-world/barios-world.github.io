@@ -1008,6 +1008,28 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Ledge forgiveness: arriving at a ledge with the feet a few px too low counts as a landing, not a wall hit
+   *  (Arcade resolves the corner as a horizontal push otherwise and Bario slides into the pit). */
+  private ledgeAssist() {
+    const b = this.player.body;
+    if (b.blocked.down || b.velocity.y <= 0) return;
+    // look a few px ahead in the direction of travel: by the time Arcade reports blocked.right the feet are already too low
+    const dir = b.blocked.right ? 1 : b.blocked.left ? -1 : Math.sign(b.velocity.x);
+    if (!dir) return;
+    const fx = dir > 0 ? b.right + 4 : b.left - 4;
+    let top = Infinity;
+    const t = this.ground.getTileAtWorldXY(fx, b.bottom - 1, true);
+    if (t && t.index > 0) {
+      const above = this.ground.getTileAtWorldXY(fx, t.pixelY - 1, true);
+      if (!above || above.index <= 0) top = t.pixelY;
+    }
+    for (const sb of this.physics.overlapRect(fx - 1, b.bottom - 2, 2, 2, false, true) as Phaser.Physics.Arcade.StaticBody[]) {
+      if (sb.gameObject && this.solids.contains(sb.gameObject)) top = Math.min(top, sb.top);
+    }
+    const lift = b.bottom - top;
+    if (lift > 0 && lift <= T.LEDGE_ASSIST) { b.y -= lift; b.x += dir * 3; b.velocity.y = 0; }   // step onto the ledge, no corner hang
+  }
+
   // ------------------------------------------------------------ loop
   update(_time: number, delta: number) {
     const dt = Math.min(delta, 50) / 1000;
@@ -1015,7 +1037,7 @@ export class GameScene extends Phaser.Scene {
     if (this.overlay) return;
     if (this.finished) { this.player.syncGfx(); return; }
     if (this.inputSys.pausePressed) { this.pauseGame(); return; }
-    if (!this.player.dead) this.player.update(this.inputSys, dt);
+    if (!this.player.dead) { this.player.update(this.inputSys, dt); this.ledgeAssist(); }
     else this.player.syncGfx();
 
     const now = this.time.now;

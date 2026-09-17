@@ -40,7 +40,8 @@ npm run build      # tsc + Vite -> dist/ (GitHub Pages deployt automatisch bei j
 npm run spielbuch  # design/spielbuch.html neu bauen
 ```
 
-- **Level:** `tools/levels/gen.py` (DSL) → `levels/src/*.txt` (ASCII) → `npm run levels` → `src/assets/levels/*.tmj` (Tiled-JSON). `tools/levels/check.py` prüft die Erreichbarkeit aller Level, `preview.py` rendert PNGs.
+- **Level:** `tools/levels/gen.py` (DSL) → `levels/src/*.txt` (ASCII) → `npm run levels` → `src/assets/levels/*.tmj` (Tiled-JSON). `tools/levels/check.py` prüft jedes Level gegen Barios echte Körpergröße und den gemessenen Sprung (Hauptweg: max. 2 Kacheln hoch, Lücken ≤ 4/3/2; Karten ≤ 4 Reihen über einem Standplatz; Blöcke 2–4 Reihen über dem Boden; keine 1-Kachel-Schlitze). `preview.py` rendert PNGs nach `tools/levels/out/`.
+- **Sprung (gemessen, JUMP_V 700):** 4,0 Kacheln hoch, 5,5 Kacheln weit im Lauf, 3 im Gehen.
 - **Sprites:** `tools/sprites/` (Python + Pillow): `px.py` Primitive, `figures.py` Figuren, `poses.py` Requisiten, `items.py` Icons, `env.py` Kacheln/Deko, `assemble.py` Sprite-Liste, `atlas.py` → `src/assets/atlas.png/json`.
 - **Tuning:** alle Zahlen in `src/config/Tuning.ts` (mit Debug-Reglern), Formen in `src/data/forms.ts`, Welten in `src/data/worlds.ts`, Level-Liste in `src/data/levels.ts`.
 - **Tests im Browser:** Phaser deterministisch steppen: `window.__step(n)` ruft `game.loop.step()` (Tweens laufen auf `Date.now()` – im Harness `scene.tweens.getDelta = () => 16.67` setzen).

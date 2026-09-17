@@ -4,7 +4,7 @@ export const T = {
   FALL_MULT: 1.6,
   APEX_MULT: 0.55,
   APEX_WINDOW: 60,
-  JUMP_V: 620,
+  JUMP_V: 700,
   JUMP_CUT: 0.4,
   COYOTE_MS: 100,
   BUFFER_MS: 120,
@@ -22,6 +22,7 @@ export const T = {
   CAM_DEADZONE_W: 60,
   CAM_DEADZONE_H: 40,
   HITSTOP_MS: 60,
+  LEDGE_ASSIST: 16,
   STICK_RADIUS: 46,
   STICK_DEADZONE: 0.12,
   // combat
