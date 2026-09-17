@@ -130,6 +130,12 @@ export const TRACKS: Record<string, Track> = {
   vfb: TRACK_VFB, title: TRACK_TITLE, boss: TRACK_BOSS,
 };
 
+/** Real speech: small AAC clips generated offline with macOS `say` (see tools/voice.md). Played with a per-voice playback rate;
+ *  the syllable synth below stays as a fallback while clips load or if decoding fails. */
+const VOICE_URLS = import.meta.glob('../assets/voice/*.m4a', { query: '?url', import: 'default', eager: true }) as Record<string, string>;
+const VOICE_RATE: Record<VoiceName, number> = { bario: 1.08, baby: 1.25, boss: 0.74 };
+const VOICE_GAIN: Record<VoiceName, number> = { bario: 1.0, baby: 0.8, boss: 1.15 };
+
 class Synth {
   private ctx?: AudioContext;
   private master?: GainNode;
@@ -137,6 +143,10 @@ class Synth {
   private musicBus?: GainNode;
   private voiceBus?: GainNode;
   private lastSay: Record<string, number> = {};
+  private clips: Record<string, AudioBuffer> = {};
+  private clipsLoading = false;
+  /** last clip key that actually played (tests) */
+  lastClip = '';
   private noiseBuf?: AudioBuffer;
   sound = true;
   music = true;
@@ -159,7 +169,20 @@ class Synth {
       const d = this.noiseBuf.getChannelData(0);
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
       if (this.track) this.startScheduler();
+      void this.loadClips();
     } catch { /* no audio */ }
+  }
+
+  private async loadClips() {
+    if (!this.ctx || this.clipsLoading) return;
+    this.clipsLoading = true;
+    await Promise.all(Object.entries(VOICE_URLS).map(async ([path, url]) => {
+      const key = path.split('/').pop()!.replace(/\.m4a$/, '');
+      try {
+        const data = await (await fetch(url)).arrayBuffer();
+        this.clips[key] = await this.ctx!.decodeAudioData(data);
+      } catch { /* clip stays synthetic */ }
+    }));
   }
 
   get ready() { return !!this.ctx; }
@@ -234,10 +257,23 @@ class Synth {
   /** Speak a phrase in a character voice. Same-voice calls inside a short gap are dropped so pickups never stack. */
   say(who: VoiceName, line: string) {
     if (!this.sound || !this.ctx) return;
-    const phrase = PHRASES[who][line];
-    if (!phrase) return;
     const now = this.ctx.currentTime;
     if (now < (this.lastSay[who] ?? 0)) return;
+    const clip = this.clips[`${who}_${line}`];
+    if (clip) {
+      const out = this.voiceBus ?? this.sfxBus!;
+      const src = this.ctx.createBufferSource();
+      src.buffer = clip;
+      src.playbackRate.value = VOICE_RATE[who];
+      const g = this.ctx.createGain(); g.gain.value = VOICE_GAIN[who];
+      src.connect(g); g.connect(out);
+      src.start(now);
+      this.lastSay[who] = now + Math.max(0.25, (clip.duration / VOICE_RATE[who]) * 0.75);
+      this.lastClip = `${who}_${line}`;
+      return;
+    }
+    const phrase = PHRASES[who][line];
+    if (!phrase) return;
     const total = phrase.reduce((sum, y) => sum + y.d * 0.92, 0);
     this.lastSay[who] = now + Math.max(0.25, total * 0.7);
     let t = now + 0.01;

@@ -4,7 +4,7 @@
 
 ## Spielen (iPhone)
 
-Dauer-Link: **https://zischanahmad.github.io/barios-world/**
+Dauer-Link: **https://barios-world.github.io/**
 
 1. Link in Safari öffnen, iPhone quer halten.
 2. Teilen-Symbol → **Zum Home-Bildschirm** → das Spiel läuft als Vollbild-App, auch offline.
@@ -33,7 +33,7 @@ Jedes Level: 4 Royals (eins im Bonusraum), Sektionen mit eigener Musik-Stimmung 
 
 Sechs Formen (Sport-Suchti, Boxer, Skater, Sprayer, DJ, Rocker), vier Specials, KHUSRA MUND, Barios Shop mit fünf Level-Ups, Boss Rush (nach dem ersten Sieg über den Direktor – der Gürtel zählt die Zeit).
 
-**Stimmen:** alles synthetisiert (Silben-Synth im WebAudio, keine Dateien). Bario bedankt sich fabulös für jede Karte („¡Gracias!", „¡Fabuloso!", „¡Qué rico!") und ruft „Khusra!", die Meistersager brabbeln Baby-Laute („Gaga?", „Wääh!", „Meithhter!"), der Direktor grollt tief wie Bowser („Ruhe im Spiel, Chaos im Kopf", „Mehr Zucker!", „Ha ha ha!"). Alle Sprüche stehen in `src/systems/Audio.ts` (`PHRASES`).
+**Stimmen:** echte Sprache – 26 kleine AAC-Clips (178 KB), kostenlos erzeugt mit der macOS-Sprachausgabe (`say`: Bario = Eddy/Spanisch, Direktor = Rocko/Deutsch tief abgespielt, Meistersager = Junior schnell abgespielt; Skript in `tools/voice.md`). Fällt ein Clip aus, springt der Silben-Synth ein. Bario bedankt sich fabulös für jede Karte („¡Gracias!", „¡Fabuloso!", „¡Qué rico!") und ruft „Khusra!", die Meistersager brabbeln Baby-Laute („Gaga?", „Wääh!", „Meithhter!"), der Direktor grollt tief wie Bowser („Ruhe im Spiel, Chaos im Kopf", „Mehr Zucker!", „Ha ha ha!"). Alle Sprüche stehen in `src/systems/Audio.ts` (`PHRASES`).
 
 ## Entwickeln
 
