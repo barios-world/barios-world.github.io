@@ -11,6 +11,7 @@ import { Puddle, Vent, Ball, BallSpawner, CardPlatform, MovingPlatform } from '.
 import { LEVELS, nextLevel } from '../data/levels';
 import { worldOf } from '../data/worlds';
 import { FORMS, SPECIALS, isForm, isSpecial, type Form, type Special } from '../data/forms';
+import { UPGRADES } from '../data/upgrades';
 
 type Obj = Phaser.Types.Tilemaps.TiledObject;
 type Overlay = { kind: 'result' | 'gameover'; lines: string[]; hint: string } | null;
@@ -61,6 +62,11 @@ export class GameScene extends Phaser.Scene {
   worldScale = 1;
   khusra = 0;
   drumUntil = 0;
+  specialMul = 1;
+  khusraMul = 1;
+  cardFan = 5;
+  wissen = 0;
+  royalSparkAt = 0;
 
   constructor() { super('game'); }
 
@@ -258,8 +264,17 @@ export class GameScene extends Phaser.Scene {
     this.scale.on('resize', this.applyZoom, this);
     this.events.once('shutdown', () => this.scale.off('resize', this.applyZoom, this));
 
+    // --- upgrades from the Barios Shop
+    const up = save.data.upgrades;
+    this.player.upgradeSpeed = 1 + 0.06 * up.kaffee;
+    this.specialMul = 1 + 0.15 * up.kaffee;
+    this.khusraMul = 1 + 0.25 * up.khusra;
+    this.cardFan = 5 + up.cambio;
+    this.wissen = up.wissen;
+    void UPGRADES;
+
     // --- run state
-    const maxHearts = save.settings.assist ? 5 : 3;
+    const maxHearts = (save.settings.assist ? 5 : 3) + up.du;
     this.registry.set('maxHearts', maxHearts);
     this.registry.set('cards', 0);
     this.registry.set('royals', 0);
@@ -353,7 +368,7 @@ export class GameScene extends Phaser.Scene {
   // ------------------------------------------------------------ specials
   startSpecial(kind: Special) {
     this.special = kind;
-    this.specialUntil = this.time.now + SPECIALS[kind].ms;
+    this.specialUntil = this.time.now + SPECIALS[kind].ms * this.specialMul;
     this.registry.set('special', kind);
     audio.special();
     this.events.emit('msg', SPECIALS[kind].msg, 1600);
@@ -384,7 +399,7 @@ export class GameScene extends Phaser.Scene {
 
   addKhusra(v: number) {
     const was = this.khusra;
-    this.khusra = Math.min(100, this.khusra + v);
+    this.khusra = Math.min(100, this.khusra + v * this.khusraMul);
     this.registry.set('khusra', this.khusra);
     if (was < 100 && this.khusra >= 100) { audio.meterFull(); this.events.emit('msg', 'KHUSRA MUND BEREIT!', 1200); this.updateAura(); }
   }
@@ -395,8 +410,9 @@ export class GameScene extends Phaser.Scene {
     if (this.khusra >= 100) { this.khusraMund(); return 600; }
     if (this.special === 'cambio') {
       audio.throw();
-      for (let i = -2; i <= 2; i++) {
-        const c = new HomingCard(this, x, y - 4, dir, i * 0.5);
+      const n = this.cardFan;
+      for (let i = 0; i < n; i++) {
+        const c = new HomingCard(this, x, y - 4, dir, (i - (n - 1) / 2) * 0.5);
         c.target = this.nearestMob(x, y, 320);
         this.homing.add(c);
       }
@@ -404,7 +420,7 @@ export class GameScene extends Phaser.Scene {
     }
     const cd = FORMS[form].cooldown;
     switch (FORMS[form].attack) {
-      case 'cup': audio.throw(); this.cups.add(new Cup(this, x, y, dir)); return cd;
+      case 'cup': audio.throw(); this.cups.add(new Cup(this, x, y, dir)); return cd * (1 - 0.15 * save.data.upgrades.cambio);
       case 'punch': this.punch(dir, false); return cd;
       case 'combo': this.punch(dir, true); return cd;
       case 'spray': this.spray(dir); return cd;
@@ -830,6 +846,15 @@ export class GameScene extends Phaser.Scene {
     this.balls.getChildren().slice().forEach((b) => { const ball = b as Ball; if (ball.expired(now) || ball.y > this.map.heightInPixels + 50) ball.destroy(); });
     this.pacifiers.getChildren().slice().forEach((k) => { const pk = k as Pacifier; if (pk.expired(now) || pk.y > this.map.heightInPixels + 50) pk.destroy(); });
     if (now > this.comboUntil && this.combo) { this.combo = 0; this.registry.set('combo', 0); }
+    // Mehr Wissen: royals sparkle from afar
+    if (this.wissen > 0 && now > this.royalSparkAt) {
+      this.royalSparkAt = now + 700;
+      const reach = 260 + 140 * this.wissen;
+      this.cards.getChildren().forEach((c) => {
+        const s = c as Phaser.Physics.Arcade.Sprite;
+        if (s.getData('royal') && Math.abs(s.x - this.player.x) < reach) this.sparks.emitParticleAt(s.x, s.y, 2);
+      });
+    }
     if (now > this.punchComboUntil) this.punchCombo = 0;
 
     const cam = this.cameras.main;

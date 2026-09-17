@@ -47,7 +47,7 @@ export class HudScene extends Phaser.Scene {
     this.gfx = this.add.graphics();
     this.portrait = this.add.image(0, 0, 'spr', 'port_bario_0').setOrigin(0, 0).setScale(1.5 * u);
     this.nameTxt = this.add.text(0, 0, 'BARIO x3', font);
-    for (let i = 0; i < 5; i++) this.hearts.push(this.add.image(0, 0, 'spr', 'herz_s_0').setOrigin(0, 0).setScale(2 * u));
+    for (let i = 0; i < 7; i++) this.hearts.push(this.add.image(0, 0, 'spr', 'herz_s_0').setOrigin(0, 0).setScale(2 * u));
     this.formIcon = this.add.image(0, 0, 'spr', 'it_kaffee_0').setOrigin(0, 0).setScale(u).setVisible(false);
     this.specialIcon = this.add.image(0, 0, 'spr', 'pk_kaffeepower_0').setOrigin(0, 0).setScale(u).setVisible(false);
     this.specialBar = this.add.graphics();
@@ -150,9 +150,9 @@ export class HudScene extends Phaser.Scene {
     const L = this.inset.left + m, R = w - this.inset.right - m, top = this.inset.top + m;
     this.portrait.setPosition(L, top);
     this.nameTxt.setPosition(L + 36 * 1.5 * u + 8 * u, top + 3 * u);
-    this.hearts.forEach((hh, i) => hh.setPosition(L + 36 * 1.5 * u + 8 * u + i * 26 * u, top + 20 * u));
-    this.formIcon.setPosition(L + 36 * 1.5 * u + 8 * u + 5 * 26 * u + 4 * u, top + 16 * u);
-    this.specialIcon.setPosition(L + 36 * 1.5 * u + 8 * u + 5 * 26 * u + 32 * u, top + 16 * u);
+    this.hearts.forEach((hh, i) => hh.setPosition(L + 36 * 1.5 * u + 8 * u + i * 24 * u, top + 20 * u));
+    this.formIcon.setPosition(L + 36 * 1.5 * u + 8 * u + 7 * 24 * u + 4 * u, top + 16 * u);
+    this.specialIcon.setPosition(L + 36 * 1.5 * u + 8 * u + 7 * 24 * u + 32 * u, top + 16 * u);
     this.meterLbl.setPosition(L, top + 36 * 1.5 * u + 14 * u);
     this.cardTxt.setPosition(R, top + 6 * u);
     this.cardIcon.setPosition(R - this.cardTxt.width - 8 * u, top);

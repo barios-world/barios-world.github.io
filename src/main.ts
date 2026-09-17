@@ -8,6 +8,7 @@ import { GameScene } from './scenes/GameScene';
 import { HudScene } from './scenes/HudScene';
 import { PauseScene } from './scenes/PauseScene';
 import { SettingsScene } from './scenes/SettingsScene';
+import { ShopScene } from './scenes/ShopScene';
 import { audio } from './systems/Audio';
 import { save } from './systems/Save';
 
@@ -35,7 +36,7 @@ const game = new Phaser.Game({
   physics: { default: 'arcade', arcade: { gravity: { x: 0, y: 0 }, debug: false, tileBias: 32 } },
   input: { activePointers: 4 },
   fps: { target: 60 },
-  scene: [BootScene, PreloadScene, TitleScene, LevelSelectScene, GameScene, HudScene, PauseScene, SettingsScene],
+  scene: [BootScene, PreloadScene, TitleScene, LevelSelectScene, GameScene, HudScene, PauseScene, SettingsScene, ShopScene],
 });
 
 let fitTimer = 0;

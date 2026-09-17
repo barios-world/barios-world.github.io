@@ -31,6 +31,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   boostSpeed = 1;
   boostJump = 1;
   noCooldown = false;
+  /** permanent multiplier from the shop */
+  upgradeSpeed = 1;
   private blinkTween?: Phaser.Tweens.Tween;
   private scaleTween?: Phaser.Tweens.Tween;
   onLand?: (x: number, y: number, speed: number) => void;
@@ -137,7 +139,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // --- horizontal
     const ax = locked ? 0 : inp.axis;
     let vx = b.velocity.x;
-    const speedMul = def.speedMul * this.boostSpeed;
+    const speedMul = def.speedMul * this.boostSpeed * this.upgradeSpeed;
     if (ax !== 0) {
       const max = (Math.abs(ax) > T.RUN_THRESHOLD ? T.RUN_MAX : T.WALK_MAX) * speedMul;
       const target = Math.sign(ax) * max;

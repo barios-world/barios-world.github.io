@@ -38,18 +38,19 @@ export class TitleScene extends Phaser.Scene {
     const bw = 150 * u, bh = 28 * u, cx = w / 2;
     const firstOpen = LEVELS.find((l) => l.world > 0 && !save.progress(l.key).cleared && save.isUnlocked(l.key, LEVELS[0].key)) ?? LEVELS[0];
     const anyCleared = LEVELS.some((l) => save.progress(l.key).cleared);
-    let y = h * 0.5;
+    let y = h * 0.47;
     button(this, cx, y, bw, bh, anyCleared ? 'WEITERSPIELEN' : 'SPIELEN', () => this.startLevel(firstOpen.key), { primary: true, u });
-    y += bh + 10 * u;
+    y += bh + 8 * u;
     button(this, cx, y, bw, bh, 'WEGWEISER', () => this.scene.start('levels'), { u });
-    y += bh + 10 * u;
-    button(this, cx, y, bw, bh, 'OPTIONEN', () => this.scene.launch('settings', { from: 'title' }), { u });
+    y += bh + 8 * u;
+    button(this, cx - bw / 4 - 4 * u, y, bw / 2 - 4 * u, bh, 'SHOP', () => this.scene.start('shop'), { u, size: 8 });
+    button(this, cx + bw / 4 + 4 * u, y, bw / 2 - 4 * u, bh, 'OPTIONEN', () => this.scene.launch('settings', { from: 'title' }), { u, size: 7 });
 
     // chalk scribbles
     this.add.text(w * 0.12, h * 0.55, 'Life is\nCambio ♥', HAND(u, 14)).setOrigin(0.5).setAngle(-6).setDepth(2).setAlign('center');
     this.add.text(w * 0.86, h * 0.5, 'Same shit\ndifferent level ♥', HAND(u, 13, '#A79C90')).setOrigin(0.5).setAngle(4).setDepth(2).setAlign('center');
     this.add.text(w - 8 * u, h - 6 * u, `Karten gesamt: ${save.data.totalCards}`, PX(u, 5, '#6E635B')).setOrigin(1, 1).setDepth(2);
-    this.add.text(8 * u, h - 6 * u, 'v0.3  M3', PX(u, 5, '#6E635B')).setOrigin(0, 1).setDepth(2);
+    this.add.text(8 * u, h - 6 * u, 'v0.5  M5', PX(u, 5, '#6E635B')).setOrigin(0, 1).setDepth(2);
   }
 
   startLevel(key: string) {

@@ -1,12 +1,15 @@
 /** Progress + settings in localStorage. One object, versioned, written on every change. */
 export interface LevelProgress { cleared: boolean; bestSecs: number | null; bestCards: number; totalCards: number; royals: number; }
 export interface Settings { sound: boolean; music: boolean; leftHand: boolean; buttonScale: number; assist: boolean; }
+import { NO_UPGRADES, type UpgradeKey, type Upgrades } from '../data/upgrades';
+
 export interface SaveData {
   version: 1;
   progress: Record<string, LevelProgress>;
   unlocked: string[];
   settings: Settings;
   totalCards: number;
+  upgrades: Upgrades;
 }
 
 const KEY = 'barios-world-save-v1';
@@ -17,6 +20,7 @@ const fresh = (): SaveData => ({
   unlocked: [],
   settings: { sound: true, music: true, leftHand: false, buttonScale: 1, assist: false },
   totalCards: 0,
+  upgrades: { ...NO_UPGRADES },
 });
 
 class SaveStore {
@@ -27,7 +31,7 @@ class SaveStore {
       const raw = localStorage.getItem(KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as Partial<SaveData>;
-        this.data = { ...fresh(), ...parsed, settings: { ...fresh().settings, ...(parsed.settings ?? {}) } };
+        this.data = { ...fresh(), ...parsed, settings: { ...fresh().settings, ...(parsed.settings ?? {}) }, upgrades: { ...NO_UPGRADES, ...(parsed.upgrades ?? {}) } };
       }
     } catch { this.data = fresh(); }
     return this.data;
@@ -69,6 +73,16 @@ class SaveStore {
     this.data.totalCards += cards;
     this.save();
     return np;
+  }
+
+  upgrade(k: UpgradeKey) { return this.data.upgrades[k] ?? 0; }
+
+  buy(k: UpgradeKey, price: number) {
+    if (this.data.totalCards < price) return false;
+    this.data.totalCards -= price;
+    this.data.upgrades[k] = (this.data.upgrades[k] ?? 0) + 1;
+    this.save();
+    return true;
   }
 
   reset() {
